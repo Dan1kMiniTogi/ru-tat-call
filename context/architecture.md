@@ -1,79 +1,61 @@
 # Архитектура
 
-## Почему своё приложение
+## Почему Mobile-First Web-приложение (PWA)
 
-ОС телефона почти не даёт стабильно перехватывать аудио чужого звонка и рисовать оверлей субтитров поверх WhatsApp/Telegram. Поэтому продукт **сам** владеет звонком: UI, медиа, субтитры.
+Для семейного использования критичен нулевой порог входа:
+- На iOS (iPhone) установка сторонних приложений без App Store ограничена сертификатом на 7 дней либо платным аккаунтом Apple Developer ($99/год) + TestFlight.
+- В современных мобильных браузерах (Safari iOS 14.3+, Chrome Android) есть полноценный **WebRTC** (`RTCPeerConnection`, `getUserMedia`) и **Web Audio API** (захват 16 kHz PCM для ASR).
+- Ссылка на комнату кидается в семейный чат Telegram/WhatsApp, пользователь открывает ссылку и сразу попадает в защищенный звонок с живыми субтитрами.
+- При желании веб-клиент сохраняется на главный экран смартфона как PWA (без адресной строки).
 
-## Компоненты
+## Компоненты системы
 
 | Компонент | Делает | Не делает |
 | --- | --- | --- |
-| **Flutter-клиент** | Логин, контакты, UI звонка (до 4 плиток), субтитры, разрешения, форвард аудио в ASR | ASR, анализ модели |
-| **Signaling** | Presence, invite/accept/reject, SDP, ICE, комнаты | Медиа, распознавание |
-| **Media (WebRTC)** | Низколатентные A/V. Для малых групп — P2P; SFU/инфра — позже, если понадобится | Текст субтитров |
-| **ASR server** | Чанки аудио → partial/final текст (+ timestamps, language, speaker_id если есть) | UI, аккаунты, управление звонком |
-| **User directory** | Identity, контакты, membership группы, метаданные комнаты, опционально настройки транскриптов | Соцсеть |
+| **Mobile-First Web Client** | UI звонка (сетка до 4 видео), захват камеры/микрофона, даунсемплинг в 16kHz PCM, оверлей субтитров | ASR инференс |
+| **Signaling Server (FastAPI)** | Аутентификация, список контактов, комнаты звонков, обмен SDP offer/answer и ICE | Передача тяжелого видео |
+| **WebRTC Media Layer** | Прямой P2P обмен аудио/видео между браузерами с минимальной задержкой | Распознавание речи |
+| **ASR Server (FastAPI / WS)** | Прием PCM чанков по WebSocket, VAD, инференс (Mock / Colab GPU / ONNX), выдача partial/final субтитров | Управление звонком |
 
-Ключ: **клиент не привязан к модели и к конкретной машине.** ASR API стабильный; железо можно менять.
-
-## Потоки
-
-Медиа и субтитры **разведены**:
+## Потоки данных
 
 ```
-Клиенты ── WebRTC media ── друг другу
-   │
-   └── signaling (WebSocket)
-   └── ASR stream (WebSocket в MVP; gRPC позже если нужно)
-           → partial/final → subtitle.update → UI
+Браузер A (iPhone Safari) ─────── WebRTC P2P Media (A/V) ─────── Браузер B (Android Chrome)
+       │                                                                 │
+       ├─── WebSocket Signaling (SDP, ICE, Room State) ──────────────────┤
+       │                                                                 │
+       └─── WebSocket ASR Stream (16kHz PCM chunks) ─────────────────────┤
+                     ↓                                                   ↓
+                ASR Server (VAD + Model Inference)
+                     ↓
+             subtitle.update (Live Subtitles Overlay)
 ```
 
-Атрибуция говорящего в MVP: **по источнику аудиопотока**, не acoustic diarization.
+## Стек технологий
 
-Язык: одна multilingual-модель предпочтительнее двух моделей + LID. Клиент не хардкодит язык. Режимы API: `auto` / `mixed` / `ru` / `tt`.
+- **Фронтенд**: HTML5, Modern Vanilla JS / Web Components, WebRTC API, Web Audio API, CSS Flex/Grid (Touch-optimized для мобильных).
+- **Бэкенд**: Python 3.10+ (FastAPI, WebSockets, Pydantic v2, `uv` менеджер пакетов).
+- **Хранилище**: SQLite + In-memory.
+- **ASR инференс**:
+  - Локально при разработке: Mock ASR + Silero VAD (нагрузка на CPU < 2%).
+  - Реальные модели: Бесплатный Google Colab / Kaggle (GPU T4) + туннель (`ngrok` / `cloudflared`) к бэкенду.
+- **Сетевой доступ и HTTPS**: Cloudflare Tunnel / ngrok (дает валидный HTTPS сертификат, необходимый для доступа мобильных браузеров к камере и микрофону).
 
-## Стек (baseline MVP)
-
-- Клиент: **Flutter** + native plugins только там, где нужны WebRTC/аудио.
-- Signaling: лёгкий backend, **WebSocket**; REST — auth и метаданные.
-- ASR: streaming, local, **model-agnostic HTTP/WS API**.
-- Деплой: **Docker** (signaling и ASR раздельно), опционально reverse proxy + TLS.
-
-Конкретный язык backend в Notion не зафиксирован — выбрать при этапе 1.
-
-## Слои клиента
-
-Presentation (login, contacts, call, subtitle overlay, settings) → state (session, call, participants, subtitles, connection) → communication (signaling, WebRTC wrapper, ASR consumer) → domain models → infrastructure (REST, WS, permissions, logging).
-
-Экраны MVP: вход, контакты, исходящий/входящий звонок, активный звонок, настройки, ошибка/reconnect. Во время звонка на первом плане только видео и субтитры.
-
-Состояния звонка: `idle`, `incoming_call`, `outgoing_call`, `connecting`, `connected`, `reconnecting`, `asr_disconnected`, `ended`, `error`.
-
-Состояния субтитров: empty, receiving partial, received final, delayed, interrupted, unavailable — **отдельно** от состояния звонка.
-
-## Репозиторий (целевая структура)
+## Структура репозитория
 
 ```
 repo-root/
-  context/                 # ТЗ и roadmap для агента
-  project/                 # вся реализация
-    apps/mobile_client/
-    services/signaling_server/
-    services/asr_server/
-    shared/
-    web_client/
-    infra/docker/
-    infra/nginx/
-    infra/scripts/
-    tests/
+  context/                 # ТЗ, архитектура и roadmap для агента
+  project/                 # вся реализация (uv workspace)
+    services/
+      signaling_server/    # FastAPI + WebSockets + Web static
+      asr_server/          # Streaming ASR + VAD + Model Connectors
+    shared/                # Общие Pydantic v2 контракты (ru-tat-call-shared)
+    web_client/            # Mobile-first Web UI (HTML5, JS, CSS, PWA)
+    infra/                 # Docker, nginx, скрипты туннелей
+    tests/                 # Интеграционные тесты
 ```
 
-Сейчас в репо только заготовка имени проекта и эта папка `context/`. Код ещё не начат.
+## Отказоустойчивость
 
-## Производительность и деградация
-
-Субтитры не должны заметно портить звонок. При нехватке ресурсов режется ASR, не медиа. Reconnect signaling/ASR с экспоненциальной паузой; при потере ASR UI звонка остаётся.
-
-## Расширения без переписывания клиента
-
-Новые языки и модели, хранение транскриптов, перевод, поиск по истории, персонализация голоса, cloud-деплой, админка. Не тащить это в MVP.
+Субтитры работают изолированно от медиапотока звонка. При сбое или перегрузке ASR-сервера WebRTC-видеосвязь между участниками **не прерывается**, а на экране появляется мягкий индикатор временной недоступности распознавания.
