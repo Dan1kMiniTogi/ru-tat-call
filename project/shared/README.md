@@ -1,5 +1,7 @@
 # shared
 
-Общий Python-пакет `ru-tat-call-shared`.
+Пакет `ru-tat-call-shared`: Pydantic-контракты REST, signaling, ASR и субтитров.
 
-Сюда в шаге 0.2 пойдут Pydantic-контракты (auth, signaling, WebRTC, ASR, субтитры). Пока только каркас пакета.
+```python
+from ru_tat_call_shared.contracts import LoginRequest, parse_signaling_message, parse_asr_message
+```
