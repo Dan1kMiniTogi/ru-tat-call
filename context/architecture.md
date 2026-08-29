@@ -54,17 +54,18 @@ Presentation (login, contacts, call, subtitle overlay, settings) → state (sess
 ## Репозиторий (целевая структура)
 
 ```
-project-root/
-  apps/mobile_client/
-  services/signaling_server/
-  services/asr_server/
-  services/user_directory/
-  shared/contracts/
-  shared/models/
-  infra/docker/
-  infra/nginx/
-  infra/scripts/
-  context/          # этот рабочий контекст (не путать с исходными Notion-черновиками)
+repo-root/
+  context/                 # ТЗ и roadmap для агента
+  project/                 # вся реализация
+    apps/mobile_client/
+    services/signaling_server/
+    services/asr_server/
+    shared/
+    web_client/
+    infra/docker/
+    infra/nginx/
+    infra/scripts/
+    tests/
 ```
 
 Сейчас в репо только заготовка имени проекта и эта папка `context/`. Код ещё не начат.

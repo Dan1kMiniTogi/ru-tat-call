@@ -9,4 +9,4 @@ alwaysApply: true
 - A large roadmap phase (not a tiny step) goes on `feature/<short-name>` branched from up-to-date `develop`, then merge back to `develop`.
 - After each finished roadmap step (or a clearly important substep): commit and `git push -u origin <branch>`.
 - Never change git config, never `--force` to `main`/`develop`, never `--no-verify`.
-- Do not commit `.env`, secrets, or `.venv`.
+- Do not commit `.env`, secrets, or `.venv` (including `project/.venv`).

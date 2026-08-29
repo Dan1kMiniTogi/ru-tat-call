@@ -17,8 +17,8 @@
 ## Фаза 0: Окружение, архитектурный каркас и контракты
 > **Цель**: Создать скелет монорепозитория, настроить `uv`, зафиксировать Pydantic-контракты (REST, Signaling WS, ASR WS).
 
-- [x] **Шаг 0.1**: Инициализация структуры монорепозитория (`services/`, `shared/`, `web_client/`, `infra/`, `tests/`) и настройка `uv` окружения (`pyproject.toml`).
-- [ ] **Шаг 0.2**: Определение общих Pydantic контрактов в `shared/contracts/` (модели Auth, Signaling Events, WebRTC SDP/ICE, ASR Stream Frames, Subtitle Updates).
+- [x] **Шаг 0.1**: Инициализация структуры монорепозитория в `project/` (`services/`, `shared/`, `web_client/`, `infra/`, `tests/`) и настройка `uv` окружения (`project/pyproject.toml`).
+- [ ] **Шаг 0.2**: Определение общих Pydantic контрактов в `project/shared/` (модели Auth, Signaling Events, WebRTC SDP/ICE, ASR Stream Frames, Subtitle Updates).
 - [ ] **Шаг 0.3**: Конфигурация запуска (`config.py`, `.env.example`, CORS, порты).
 
 ---

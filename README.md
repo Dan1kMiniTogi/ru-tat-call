@@ -2,19 +2,18 @@
 
 Self-hosted семейные видеозвонки с live-субтитрами для смешанной русско-татарской речи.
 
-Рабочий контекст: [`context/`](context/README.md). План шагов: [`context/roadmap.md`](context/roadmap.md).
+- Контекст и план для агента: [`context/`](context/README.md), [`context/roadmap.md`](context/roadmap.md)
+- Код: [`project/`](project/README.md)
 
-## Структура
+## Структура репозитория
 
 | Путь | Назначение |
 | --- | --- |
-| `shared/` | Общие контракты (`ru-tat-call-shared`) |
-| `services/signaling_server/` | Signaling / REST / комнаты |
-| `services/asr_server/` | Потоковый ASR |
-| `web_client/` | HTML-стенд для отладки WebRTC |
-| `apps/` | Flutter-клиент (позже) |
-| `infra/` | Docker и скрипты |
-| `tests/` | Интеграционные тесты |
+| `context/` | ТЗ, архитектура, roadmap |
+| `project/` | Вся реализация (uv workspace) |
+| `.cursor/rules/` | Правила для агента |
+
+Внутри `project/`: `shared/`, `services/`, `web_client/`, `apps/`, `infra/`, `tests/`.
 
 ## Разработка
 
@@ -24,6 +23,7 @@ Self-hosted семейные видеозвонки с live-субтитрами
 git clone git@github.com:Dan1kMiniTogi/ru-tat-call.git
 cd ru-tat-call
 git checkout develop
+cd project
 uv sync --all-packages --group dev
 ```
 
