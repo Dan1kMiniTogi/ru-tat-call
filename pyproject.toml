@@ -1,0 +1,21 @@
+[project]
+name = "ru-tat-call"
+version = "0.1.0"
+description = "Self-hosted family video calls with live RU/TT subtitles"
+requires-python = ">=3.10"
+dependencies = []
+
+[tool.uv]
+package = false
+
+[tool.uv.workspace]
+members = [
+    "shared",
+    "services/signaling_server",
+    "services/asr_server",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.0.0",
+]

@@ -1,0 +1,15 @@
+[project]
+name = "signaling-server"
+version = "0.1.0"
+description = "Signaling, auth and room management for ru-tat-call"
+requires-python = ">=3.10"
+dependencies = [
+    "ru-tat-call-shared",
+]
+
+[tool.uv.sources]
+ru-tat-call-shared = { workspace = true }
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
