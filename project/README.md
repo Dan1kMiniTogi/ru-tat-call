@@ -5,4 +5,5 @@
 ```bash
 cd project
 uv sync --all-packages --group dev
+cp .env.example .env   # при необходимости поправь порты и CORS
 ```

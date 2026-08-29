@@ -25,6 +25,7 @@ cd ru-tat-call
 git checkout develop
 cd project
 uv sync --all-packages --group dev
+cp .env.example .env
 ```
 
 Ветка `develop` — повседневная работа. `main` — только стабильный MVP.

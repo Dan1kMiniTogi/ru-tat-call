@@ -5,6 +5,7 @@ description = "Shared Pydantic contracts and models for ru-tat-call"
 requires-python = ">=3.10"
 dependencies = [
     "pydantic>=2.5",
+    "pydantic-settings>=2.4",
 ]
 
 [build-system]

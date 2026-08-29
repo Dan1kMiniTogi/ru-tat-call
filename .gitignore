@@ -14,3 +14,4 @@ dist/
 build/
 *.log
 .DS_Store
+pytest-cache-files-*/

@@ -18,7 +18,7 @@
 
 - [x] **Шаг 0.1**: Инициализация структуры монорепозитория в `project/` (`services/`, `shared/`, `web_client/`, `infra/`, `tests/`) и настройка `uv` окружения (`project/pyproject.toml`).
 - [x] **Шаг 0.2**: Определение общих Pydantic контрактов в `project/shared/` (модели Auth, Signaling Events, WebRTC SDP/ICE, ASR Stream Frames, Subtitle Updates).
-- [ ] **Шаг 0.3**: Конфигурация запуска (`config.py`, `.env.example`, CORS, порты, пути статики).
+- [x] **Шаг 0.3**: Конфигурация запуска (`config.py`, `.env.example`, CORS, порты, пути статики).
 
 ---
 
