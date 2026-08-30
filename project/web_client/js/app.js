@@ -170,6 +170,9 @@
       onError: function (message) {
         setHint(message);
       },
+      onStatus: function (message) {
+        setHint(message);
+      },
       onRoomReady: function (roomId) {
         startAsrPipeline(roomId).catch(function () {
           setHint("Субтитры недоступны");
@@ -258,12 +261,11 @@
         }
       },
     });
+    state.asr = client;
     const ok = await client.start(roomId);
     if (!ok) {
       setHint("Субтитры недоступны");
-      return;
     }
-    state.asr = client;
     try {
       state.pcmCapture = await window.startPcmCapture(stream, function (samples) {
         if (state.asr) {
