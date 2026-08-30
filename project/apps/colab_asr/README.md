@@ -19,6 +19,18 @@ ASR_REMOTE_URL=https://ВАШ-ТУННЕЛЬ
 2. Прогони ячейки. Публичный URL (ngrok или cloudflared) = `ASR_REMOTE_URL`.
 3. Токен ngrok, если нужен, клади в Colab Secrets `NGROK_AUTHTOKEN` — в git и в чат не копируй.
 
+## Latency (шаг 4.3)
+
+Бытовые фразы RU / TT / mixed: `phrases.py`. Синтетический PCM 500–1000 ms (не запись голоса).
+
+```bash
+cd project
+uv run python apps/colab_asr/benchmark.py
+uv run python apps/colab_asr/benchmark.py --url "$ASR_REMOTE_URL" --duration-ms 500
+```
+
+Dummy в CI. Живой GPU: смотри JSON (`p50_ms` / `p95_ms`, hypothesis vs reference). WER в git не пишем без своих записей.
+
 Локальный smoke без GPU:
 
 ```bash
