@@ -215,6 +215,31 @@ input:focus-visible {
   width: auto;
 }
 
+.incoming {
+  position: fixed;
+  left: var(--pad);
+  right: var(--pad);
+  top: max(16px, env(safe-area-inset-top));
+  z-index: 20;
+  background: var(--card);
+  border-radius: 16px;
+  padding: 16px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+}
+
+.incoming p {
+  margin: 0 0 12px;
+}
+
+.incoming-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.incoming-actions .btn {
+  flex: 1;
+}
+
 .view-room {
   display: flex;
   flex-direction: column;

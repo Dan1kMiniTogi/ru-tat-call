@@ -24,5 +24,11 @@ def test_index_and_assets(tmp_path: Path) -> None:
         js = client.get("/js/app.js")
         assert js.status_code == 200
         assert "apiLogin" in js.text
+        mesh = client.get("/js/call.js")
+        assert mesh.status_code == 200
+        assert "webrtc.offer" in mesh.text
+        assert "RTCPeerConnection" in mesh.text
+        assert "sdpMid" in mesh.text
+        assert "Принять" in page.text
         assert client.get("/health").json() == {"ok": True}
         assert client.get("/v1/users/me").status_code == 401
