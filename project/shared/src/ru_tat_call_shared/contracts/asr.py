@@ -48,11 +48,13 @@ class AsrTranscriptPayload(ApiModel):
 
 
 class AsrInfoPayload(ApiModel):
-    """asr.info payload (model_loaded, etc.)."""
+    """asr.info payload (model_loaded, session_started, chunk_buffered, …)."""
 
     message: str
     model_name: Optional[str] = None
     version: Optional[str] = None
+    chunk_bytes: Optional[int] = None
+    buffered_bytes: Optional[int] = None
 
 
 class AsrErrorPayload(ApiModel):

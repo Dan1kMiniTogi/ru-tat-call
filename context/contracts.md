@@ -127,7 +127,7 @@ Auth: `Authorization: Bearer <access_token>`. Токены не логирова
 
 У final те же поля; текст стабилизирован, есть `segment_id` в черновике — клиенту достаточно стабильного `subtitle_id`.
 
-Также: `asr.info` (например `model_loaded`), `asr.error`, `asr.stop`.
+Также: `asr.info` (например `session_started`, `chunk_buffered` с опциональными `chunk_bytes` / `buffered_bytes`, позже `model_loaded`), `asr.error`, `asr.stop`.
 
 Клиент: **один** partial обновляется in-place; final фиксируется в истории текущего звонка.
 
