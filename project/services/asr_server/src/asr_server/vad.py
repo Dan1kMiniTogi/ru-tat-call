@@ -23,14 +23,15 @@ ENERGY_RMS_THRESHOLD = 0.02
 class SpeechGate(Protocol):
     """Per-session VAD: consume PCM, return speech bytes for the recognizer."""
 
-    def feed(self, pcm: bytes) -> int:
-        """Score complete 32 ms frames and return speech byte count.
+    def feed(self, pcm: bytes) -> bytes:
+        """Score complete 32 ms frames and return concatenated speech PCM.
 
         Args:
             pcm: New 16 kHz mono s16le bytes.
 
         Returns:
-            Number of bytes classified as speech (multiple of WINDOW_BYTES).
+            Speech frames only (length is a multiple of WINDOW_BYTES, or the
+            raw chunk for `off`).
         """
 
     def reset(self) -> None:
@@ -40,8 +41,8 @@ class SpeechGate(Protocol):
 class PassthroughGate:
     """`asr_vad=off`: every byte is treated as speech."""
 
-    def feed(self, pcm: bytes) -> int:
-        return len(pcm)
+    def feed(self, pcm: bytes) -> bytes:
+        return pcm
 
     def reset(self) -> None:
         return None
@@ -57,7 +58,7 @@ class FrameGate:
 
     Example:
         gate = FrameGate(energy_speech_prob, threshold=ENERGY_RMS_THRESHOLD)
-        n = gate.feed(pcm)
+        speech = gate.feed(pcm)
     """
 
     def __init__(self, score, threshold: float, name: str) -> None:
@@ -66,15 +67,15 @@ class FrameGate:
         self.name = name
         self._buf = bytearray()
 
-    def feed(self, pcm: bytes) -> int:
+    def feed(self, pcm: bytes) -> bytes:
         self._buf.extend(pcm)
-        speech = 0
+        speech = bytearray()
         while len(self._buf) >= WINDOW_BYTES:
             frame = bytes(self._buf[:WINDOW_BYTES])
             del self._buf[:WINDOW_BYTES]
             if self._score(frame) >= self.threshold:
-                speech += WINDOW_BYTES
-        return speech
+                speech.extend(frame)
+        return bytes(speech)
 
     def reset(self) -> None:
         self._buf.clear()

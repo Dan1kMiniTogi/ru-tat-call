@@ -17,7 +17,7 @@ from ru_tat_call_shared.config import Settings
 
 from asr_server.auth import display_name_for_user, user_id_for_token
 from asr_server.buffer import AudioFormatError, StreamSession
-from asr_server.mock_engine import MockEngine, MockUtterance, to_asr_event, to_subtitle_event
+from asr_server.engine import ASREngine, TranscriptUtterance, build_asr_engine, to_asr_event, to_subtitle_event
 from asr_server.vad import SpeechGate, build_speech_gate
 
 ws_router = APIRouter()
@@ -63,11 +63,11 @@ def _info(
     )
 
 
-async def _emit_mock(
+async def _emit_transcripts(
     websocket: WebSocket,
     session: StreamSession,
     speaker_name: str,
-    utterances: list[MockUtterance],
+    utterances: list[TranscriptUtterance],
 ) -> None:
     """Send asr.partial/final and try to fan-out subtitle.update.
 
@@ -75,7 +75,7 @@ async def _emit_mock(
         websocket: ASR client socket.
         session: Active stream (room_id, user_id, session_id).
         speaker_name: Label for the overlay (may be empty).
-        utterances: Steps from MockEngine.
+        utterances: Steps from the active ASREngine.
     """
     publisher = websocket.app.state.subtitle_publisher
     for utt in utterances:
@@ -89,14 +89,15 @@ async def _emit_mock(
 
 @ws_router.websocket("/v1/stream")
 async def asr_stream(websocket: WebSocket, token: str = Query(...)) -> None:
-    """Accept PCM, run the mock engine, emit transcripts (call stays up if publish fails).
+    """Accept PCM, run ASREngine, emit transcripts (call stays up if publish fails).
 
     Query:
         token: Access token from signaling login (same SQLite `sessions` table).
 
     Client → server: `asr.start`, `asr.audio` (16 kHz mono pcm_s16le), `asr.stop`.
     Server → client: `asr.info`, `asr.partial`, `asr.final`, or `asr.error`.
-    VAD (`ASR_VAD=silero|energy|off`) drops silence before the mock engine.
+    Engine: `ASR_ENGINE=mock|remote|local` (remote/local without URL/path fall back to mock).
+    VAD (`ASR_VAD=silero|energy|off`) drops silence before the engine.
     Signaling members also get `subtitle.update` via `SIGNALING_INTERNAL_URL`.
 
     Example:
@@ -111,7 +112,7 @@ async def asr_stream(websocket: WebSocket, token: str = Query(...)) -> None:
         return
 
     session: StreamSession | None = None
-    engine: MockEngine | None = None
+    engine: ASREngine | None = None
     gate: SpeechGate | None = None
     speaker_name = display_name_for_user(settings.sqlite_path, user_id)
     try:
@@ -130,10 +131,7 @@ async def asr_stream(websocket: WebSocket, token: str = Query(...)) -> None:
             if isinstance(msg, AsrStartEvent):
                 session = StreamSession(session_id=msg.session_id, user_id=user_id)
                 session.start(msg.payload)
-                engine = MockEngine(
-                    return_partial=msg.payload.return_partial,
-                    return_final=msg.payload.return_final,
-                )
+                engine = build_asr_engine(settings, msg.payload)
                 gate, vad_name = build_speech_gate(settings.asr_vad, settings.asr_vad_threshold)
                 gate.reset()
                 if msg.payload.speaker_labels:
@@ -144,7 +142,7 @@ async def asr_stream(websocket: WebSocket, token: str = Query(...)) -> None:
                     _info(
                         msg.session_id,
                         "session_started",
-                        model_name="mock",
+                        model_name=engine.name,
                         version=vad_name,
                     )
                 )
@@ -161,24 +159,24 @@ async def asr_stream(websocket: WebSocket, token: str = Query(...)) -> None:
                         _error(msg.session_id, ErrorCode.INVALID_AUDIO_FORMAT, str(exc))
                     )
                     continue
-                speech_n = gate.feed(session.last_chunk)
+                speech = gate.feed(session.last_chunk)
                 await websocket.send_json(
                     _info(
                         msg.session_id,
                         "chunk_buffered",
                         chunk_bytes=added,
                         buffered_bytes=len(session.pcm),
-                        speech_bytes=speech_n,
+                        speech_bytes=len(speech),
                     )
                 )
-                await _emit_mock(websocket, session, speaker_name, engine.feed(speech_n))
+                await _emit_transcripts(websocket, session, speaker_name, engine.feed(speech))
             elif isinstance(msg, AsrStopEvent):
                 if session is None or engine is None:
                     await websocket.send_json(
                         _error(msg.session_id, ErrorCode.INTERNAL_ERROR, "No active session")
                     )
                     continue
-                await _emit_mock(websocket, session, speaker_name, engine.flush())
+                await _emit_transcripts(websocket, session, speaker_name, engine.flush())
                 total = session.stop()
                 await websocket.send_json(
                     _info(

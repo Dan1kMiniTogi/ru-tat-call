@@ -46,7 +46,7 @@ def create_app(
     @app.get("/health")
     def health() -> dict:
         """Liveness probe."""
-        return {"ok": True, "role": "asr"}
+        return {"ok": True, "role": "asr", "engine": cfg.asr_engine}
 
     return app
 
