@@ -17,6 +17,7 @@ def test_default_ports_and_cors() -> None:
     assert settings.asr_onnx_path == ""
     assert settings.asr_vad == "silero"
     assert settings.signaling_internal_url == "http://127.0.0.1:8000"
+    assert settings.signaling_disconnect_grace_s == 3.0
     assert settings.web_client_dir == PROJECT_ROOT / "web_client"
     assert settings.sqlite_path == PROJECT_ROOT / "data" / "app.db"
 

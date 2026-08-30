@@ -41,6 +41,7 @@ class Settings(BaseSettings):
         asr_vad: `silero` (CPU ONNX), `energy` (RMS fallback), or `off`.
         asr_vad_threshold: Speech probability cutoff for Silero (0–1).
         max_participants: Hard cap for a room (product MVP: 4).
+        signaling_disconnect_grace_s: Delay before leave-on-WS-drop (reconnect).
     """
 
     model_config = SettingsConfigDict(
@@ -66,6 +67,7 @@ class Settings(BaseSettings):
     asr_vad: str = "silero"
     asr_vad_threshold: float = Field(default=0.5, ge=0.0, le=1.0)
     max_participants: int = Field(default=4, ge=2, le=4)
+    signaling_disconnect_grace_s: float = Field(default=3.0, ge=0.0, le=60.0)
 
     @field_validator("sqlite_path", "web_client_dir", mode="before")
     @classmethod

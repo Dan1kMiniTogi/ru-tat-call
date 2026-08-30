@@ -31,6 +31,11 @@ def test_index_and_assets(tmp_path: Path) -> None:
         assert "sdpMid" in mesh.text
         assert "onRoomReady" in mesh.text
         assert "subtitle.update" in mesh.text
+        assert "iceRestart" in mesh.text
+        recon = client.get("/js/reconnect.js")
+        assert recon.status_code == 200
+        assert "nextDelay" in recon.text
+        assert "reconnect.js" in page.text
         subs = client.get("/js/subtitles.js")
         assert subs.status_code == 200
         assert "SubtitleStore" in subs.text
@@ -46,6 +51,7 @@ def test_index_and_assets(tmp_path: Path) -> None:
         asr_js = client.get("/js/asr.js")
         assert asr_js.status_code == 200
         assert "asr.audio" in asr_js.text
+        assert "_wantLive" in asr_js.text
         capture = client.get("/js/pcm-capture.js")
         assert capture.status_code == 200
         assert "audioWorklet" in capture.text

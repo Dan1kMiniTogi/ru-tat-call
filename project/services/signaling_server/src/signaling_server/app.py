@@ -37,9 +37,15 @@ def create_app(settings: Optional[Settings] = None) -> FastAPI:
         db.seed_family_if_empty()
         app.state.db = db
         app.state.settings = cfg
-        app.state.rooms = RoomManager(max_participants=cfg.max_participants)
-        yield
-        db.close()
+        app.state.rooms = RoomManager(
+            max_participants=cfg.max_participants,
+            disconnect_grace_s=cfg.signaling_disconnect_grace_s,
+        )
+        try:
+            yield
+        finally:
+            app.state.rooms.cancel_pending_leaves()
+            db.close()
 
     app = FastAPI(title="ru-tat-call signaling", version="0.1.0", lifespan=lifespan)
     app.add_middleware(

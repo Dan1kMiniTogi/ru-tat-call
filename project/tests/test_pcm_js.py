@@ -21,6 +21,7 @@ def test_pcm_js_syntax_and_downsample() -> None:
         "call.js",
         "app.js",
         "subtitles.js",
+        "reconnect.js",
     ):
         subprocess.run([node, "--check", str(js_dir / name)], check=True)
     selftest = PROJECT_ROOT / "tests" / "js" / "pcm_selftest.js"
@@ -30,3 +31,13 @@ def test_pcm_js_syntax_and_downsample() -> None:
         text=True,
     )
     assert result.returncode == 0, result.stderr or result.stdout
+    recon = subprocess.run(
+        [
+            node,
+            str(PROJECT_ROOT / "tests" / "js" / "reconnect_selftest.js"),
+            str(js_dir / "reconnect.js"),
+        ],
+        capture_output=True,
+        text=True,
+    )
+    assert recon.returncode == 0, recon.stderr or recon.stdout

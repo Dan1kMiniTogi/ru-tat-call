@@ -46,6 +46,7 @@
    * @param {function(string): void} hooks.onError
    * @param {function(string): void} [hooks.onRoomReady] Room id after create or accept.
    * @param {function(object): void} [hooks.onSubtitle] subtitle.update payload.
+   * @param {function(string): void} [hooks.onStatus] Reconnect / ICE hint (empty clears).
    */
   function MeshClient(hooks) {
     this._hooks = hooks;
@@ -54,6 +55,9 @@
     this.peers = {};
     this._req = 0;
     this._intentionalClose = false;
+    this._reconnectTimer = null;
+    this._attempt = 0;
+    this._restarting = {};
   }
 
   MeshClient.prototype._nextId = function () {
@@ -76,27 +80,43 @@
   };
 
   /**
-   * Open `/ws/signaling`. Resolves when the socket is open.
+   * Open `/ws/signaling`. Keeps existing RTCPeerConnections on reconnect.
    *
    * @returns {Promise<void>}
    */
   MeshClient.prototype.connect = function () {
     const self = this;
-    this.disconnect();
+    this._clearReconnectTimer();
+    this._dropSocket();
     this._intentionalClose = false;
     return new Promise(function (resolve, reject) {
       const ws = new WebSocket(signalingWsUrl(self._hooks.token()));
       self.ws = ws;
+      let settled = false;
       ws.onopen = function () {
+        self._attempt = 0;
+        settled = true;
         resolve();
       };
       ws.onerror = function () {
-        reject(new Error("Signaling WebSocket error"));
+        if (!settled) {
+          settled = true;
+          reject(new Error("Signaling WebSocket error"));
+        }
       };
       ws.onclose = function () {
-        if (!self._intentionalClose && self._hooks.onError) {
-          self._hooks.onError("Соединение сигнализации закрыто");
+        self.ws = null;
+        if (!settled) {
+          settled = true;
+          reject(new Error("Signaling WebSocket closed"));
         }
+        if (self._intentionalClose) {
+          return;
+        }
+        if (self._hooks.onStatus) {
+          self._hooks.onStatus("Переподключение сигнализации…");
+        }
+        self._scheduleReconnect();
       };
       ws.onmessage = function (ev) {
         let msg;
@@ -110,19 +130,63 @@
     });
   };
 
+  /**
+   * Close the signaling socket without tearing down RTCPeerConnections.
+   */
+  MeshClient.prototype._dropSocket = function () {
+    if (!this.ws) {
+      return;
+    }
+    this.ws.onclose = null;
+    this.ws.onmessage = null;
+    this.ws.onerror = null;
+    try {
+      this.ws.close();
+    } catch (e) {}
+    this.ws = null;
+  };
+
+  MeshClient.prototype._clearReconnectTimer = function () {
+    if (this._reconnectTimer) {
+      clearTimeout(this._reconnectTimer);
+      this._reconnectTimer = null;
+    }
+  };
+
+  /**
+   * Retry `connect()` with exponential backoff, then ICE-restart all peers.
+   */
+  MeshClient.prototype._scheduleReconnect = function () {
+    const self = this;
+    if (this._intentionalClose || this._reconnectTimer) {
+      return;
+    }
+    const delay = (root.RuTatReconnect && root.RuTatReconnect.nextDelay
+      ? root.RuTatReconnect.nextDelay(this._attempt)
+      : 500);
+    this._attempt += 1;
+    this._reconnectTimer = setTimeout(function () {
+      self._reconnectTimer = null;
+      self.connect()
+        .then(function () {
+          if (self._hooks.onStatus) {
+            self._hooks.onStatus("");
+          }
+          return self.restartIceAll();
+        })
+        .catch(function () {
+          self._scheduleReconnect();
+        });
+    }, delay);
+  };
+
   MeshClient.prototype.disconnect = function () {
     this._intentionalClose = true;
+    this._clearReconnectTimer();
+    this._dropSocket();
     this.closePeers();
     this.roomId = null;
-    if (this.ws) {
-      this.ws.onclose = null;
-      this.ws.onmessage = null;
-      this.ws.onerror = null;
-      try {
-        this.ws.close();
-      } catch (e) {}
-      this.ws = null;
-    }
+    this._attempt = 0;
   };
 
   MeshClient.prototype.closePeers = function () {
@@ -206,8 +270,60 @@
           : new MediaStream([ev.track]);
       self._hooks.onRemoteStream(peerId, remote);
     };
+    pc.oniceconnectionstatechange = function () {
+      if (pc.iceConnectionState === "failed") {
+        self.restartIce(peerId);
+      }
+    };
     this.peers[peerId] = slot;
     return slot;
+  };
+
+  /**
+   * ICE restart toward one peer (after signaling reconnect or ICE failed).
+   *
+   * @param {string} peerId
+   * @returns {Promise<void>}
+   */
+  MeshClient.prototype.restartIce = async function (peerId) {
+    const me = this._hooks.me();
+    if (!this.roomId || !me || peerId === me.user_id) {
+      return;
+    }
+    if (this._restarting[peerId]) {
+      return;
+    }
+    const slot = this.peers[peerId];
+    if (!slot) {
+      return;
+    }
+    this._restarting[peerId] = true;
+    try {
+      const offer = await slot.pc.createOffer({ iceRestart: true });
+      await slot.pc.setLocalDescription(offer);
+      this.send("webrtc.offer", {
+        room_id: this.roomId,
+        from_user_id: me.user_id,
+        to_user_id: peerId,
+        sdp: slot.pc.localDescription.sdp,
+      });
+    } catch (e) {
+    } finally {
+      delete this._restarting[peerId];
+    }
+  };
+
+  /**
+   * ICE restart for every live peer.
+   *
+   * @returns {Promise<void>}
+   */
+  MeshClient.prototype.restartIceAll = async function () {
+    const self = this;
+    const ids = Object.keys(this.peers);
+    for (let i = 0; i < ids.length; i++) {
+      await self.restartIce(ids[i]);
+    }
   };
 
   /**
