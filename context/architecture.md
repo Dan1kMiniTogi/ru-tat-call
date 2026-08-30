@@ -28,7 +28,7 @@
                      ↓                                                   ↓
                 ASR Server (VAD + Model Inference)
                      ↓
-             subtitle.update (Live Subtitles Overlay)
+             subtitle.update → signaling POST /v1/internal/subtitles → комнаты
 ```
 
 ## Стек технологий

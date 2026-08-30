@@ -25,6 +25,7 @@ from ru_tat_call_shared.contracts.signaling import (
     WebrtcOfferEvent,
     parse_signaling_message,
 )
+from ru_tat_call_shared.contracts.subtitles import SubtitleUpdateEvent
 
 from signaling_server.security import new_token
 
@@ -303,6 +304,29 @@ class RoomManager:
             )
             return
         await self.send(target, dump_message(msg))
+
+    async def broadcast_subtitle(self, event: SubtitleUpdateEvent) -> int:
+        """Send `subtitle.update` to every member of the room.
+
+        Args:
+            event: Validated subtitle event (room_id + payload).
+
+        Returns:
+            Number of sockets the JSON was written to. 0 if the room is unknown
+            or empty (ASR must still keep streaming).
+
+        Example:
+            n = await manager.broadcast_subtitle(event)
+        """
+        room = self._rooms.get(event.room_id)
+        if room is None:
+            return 0
+        blob = event.model_dump(mode="json")
+        delivered = 0
+        for member in list(room.members):
+            if await self.send(member, blob):
+                delivered += 1
+        return delivered
 
     async def _leave_room(self, user_id: str, room_id: str) -> None:
         room = self._rooms.get(room_id)

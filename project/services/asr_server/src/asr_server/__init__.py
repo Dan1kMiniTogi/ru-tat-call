@@ -1,10 +1,10 @@
-"""Streaming ASR server package for ru-tat-call.
+"""Streaming ASR server: PCM buffer over WebSocket (mock STT in step 2.2).
 
-Will accept PCM chunks over WebSocket and emit partial/final subtitles.
-Step 0.1 is package layout only.
+Run from `project/`:
 
-Example:
-    import asr_server
+    uv run uvicorn asr_server.app:app --host 0.0.0.0 --port 8001
+
+Auth uses the same SQLite `sessions` table as signaling (`SQLITE_PATH`).
 """
 
 __version__ = "0.1.0"

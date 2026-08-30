@@ -18,6 +18,7 @@ from ru_tat_call_shared.contracts.rest import (
     TranscriptionSettings,
     TranscriptResponse,
     UserProfile,
+    ClientConfigResponse,
 )
 
 from signaling_server.db import Database
@@ -49,6 +50,23 @@ def current_user_id(
     if user_id is None:
         raise api_error(401, ErrorCode.INVALID_TOKEN, "Access token is invalid or expired")
     return user_id
+
+
+@router.get("/client-config", response_model=ClientConfigResponse)
+def client_config(request: Request) -> ClientConfigResponse:
+    """Public bootstrap for the SPA (ASR WebSocket URL).
+
+    Uses the request hostname so LAN phones hit the same host on ASR_PORT.
+
+    Example:
+        GET /v1/client-config → {"asr_ws_url": "ws://192.168.0.5:8001/v1/stream"}
+    """
+    settings = request.app.state.settings
+    host = request.url.hostname or "127.0.0.1"
+    scheme = "wss" if request.url.scheme == "https" else "ws"
+    return ClientConfigResponse(
+        asr_ws_url=f"{scheme}://{host}:{settings.asr_port}/v1/stream"
+    )
 
 
 @router.post("/auth/login", response_model=LoginResponse)

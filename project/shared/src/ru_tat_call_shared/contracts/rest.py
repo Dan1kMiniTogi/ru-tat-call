@@ -105,3 +105,13 @@ class TranscriptResponse(ApiModel):
     """GET /v1/calls/{call_id}/transcript when persistence is on."""
 
     items: list[TranscriptSegment]
+
+
+class ClientConfigResponse(ApiModel):
+    """GET /v1/client-config — bootstrap URLs for the browser SPA.
+
+    Args:
+        asr_ws_url: WebSocket origin for `/v1/stream` (same host, ASR_PORT).
+    """
+
+    asr_ws_url: str

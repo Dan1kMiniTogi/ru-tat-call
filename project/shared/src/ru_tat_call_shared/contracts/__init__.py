@@ -38,6 +38,7 @@ from ru_tat_call_shared.contracts.rest import (
     TranscriptSegment,
     TranscriptResponse,
     UserProfile,
+    ClientConfigResponse,
 )
 from ru_tat_call_shared.contracts.signaling import (
     CallAcceptPayload,
@@ -76,6 +77,7 @@ __all__ = [
     "TranscriptSegment",
     "TranscriptResponse",
     "UserProfile",
+    "ClientConfigResponse",
     "CallAcceptPayload",
     "CallInvitePayload",
     "CallRejectPayload",
