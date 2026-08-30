@@ -26,6 +26,7 @@ git checkout develop
 cd project
 uv sync --all-packages --group dev
 cp .env.example .env
+uv run uvicorn signaling_server.app:app --host 0.0.0.0 --port 8000
 ```
 
 Ветка `develop` — повседневная работа. `main` — только стабильный MVP.
