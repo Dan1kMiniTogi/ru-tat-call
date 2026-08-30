@@ -6,7 +6,7 @@
 
 Схема: аудио → буфер → нормализация (16 kHz mono PCM) → VAD (желательно) → окна с overlap → streaming inference → постобработка (дубли, склейка, пунктуация без агрессивной «правки» татарского, длина строк) → partial/final.
 
-Сейчас (шаг 4.2): `ASR_ENGINE=remote` + `ASR_REMOTE_URL` (туннель Colab) шлёт PCM на `POST /v1/transcribe`. Без URL остаётся mock. Воркер: `project/apps/colab_asr/`.
+Сейчас (шаг 4.3): набор бытовых RU/TT/mixed фраз и замер `feed()` в `apps/colab_asr/benchmark.py`. CI гоняет dummy (без GPU). Цифры Colab **не** записываются в репо — только вывод CLI при живом `--url`.
 
 Постобработка **не** должна: автопереводить, насильно «очищать» язык, ломать mixed-фразы.
 
