@@ -10,4 +10,5 @@ uv run uvicorn signaling_server.app:app --host 0.0.0.0 --port 8000
 ```
 
 WebSocket: `ws://127.0.0.1:8000/ws/signaling?token=ACCESS_TOKEN`  
+UI: `http://127.0.0.1:8000/` (шаг 3.1).
 События: `room.create`, `call.invite`, `call.accept`, `call.reject`, `webrtc.offer` / `answer` / `ice`.
