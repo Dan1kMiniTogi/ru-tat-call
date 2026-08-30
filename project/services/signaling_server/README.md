@@ -9,4 +9,5 @@ uv sync --all-packages --group dev
 uv run uvicorn signaling_server.app:app --host 0.0.0.0 --port 8000
 ```
 
-Демо: логин `you` / `mama` / `sister`, пароль `family`. Docs: http://127.0.0.1:8000/docs
+WebSocket: `ws://127.0.0.1:8000/ws/signaling?token=ACCESS_TOKEN`  
+События: `room.create`, `call.invite`, `call.accept`, `call.reject` (WebRTC SDP — шаг 1.3).

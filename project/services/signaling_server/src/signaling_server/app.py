@@ -9,6 +9,8 @@ from ru_tat_call_shared.config import Settings, get_settings
 
 from signaling_server.api import router
 from signaling_server.db import Database
+from signaling_server.rooms import RoomManager
+from signaling_server.ws import ws_router
 
 
 def create_app(settings: Optional[Settings] = None) -> FastAPI:
@@ -33,6 +35,7 @@ def create_app(settings: Optional[Settings] = None) -> FastAPI:
         db.seed_family_if_empty()
         app.state.db = db
         app.state.settings = cfg
+        app.state.rooms = RoomManager(max_participants=cfg.max_participants)
         yield
         db.close()
 
@@ -45,6 +48,7 @@ def create_app(settings: Optional[Settings] = None) -> FastAPI:
         allow_headers=["*"],
     )
     app.include_router(router)
+    app.include_router(ws_router)
 
     @app.get("/health")
     def health() -> dict:
