@@ -1,5 +1,5 @@
 /**
- * Mobile-first call UI: login, contacts, 2x2 room, WebRTC mesh (step 3.2).
+ * Mobile-first call UI: login, contacts, 2x2 room, WebRTC mesh + ASR PCM (step 3.3).
  */
 (function () {
   const DEMO_USERS = [
@@ -28,6 +28,9 @@
     camOn: true,
     pendingInvite: null,
     mesh: null,
+    asrWsUrl: "",
+    asr: null,
+    pcmCapture: null,
   };
 
   /**
@@ -166,11 +169,106 @@
       onError: function (message) {
         setHint(message);
       },
+      onRoomReady: function (roomId) {
+        startAsrPipeline(roomId).catch(function () {
+          setHint("Субтитры недоступны");
+        });
+      },
     });
+  }
+
+  /**
+   * GET /v1/client-config (public). Caches asr_ws_url.
+   *
+   * @returns {Promise<string>}
+   */
+  async function loadAsrWsUrl() {
+    if (state.asrWsUrl) {
+      return state.asrWsUrl;
+    }
+    const res = await fetch("/v1/client-config");
+    if (!res.ok) {
+      throw new Error("no client-config");
+    }
+    const body = await res.json();
+    state.asrWsUrl = body.asr_ws_url || "";
+    if (!state.asrWsUrl) {
+      throw new Error("empty asr_ws_url");
+    }
+    return state.asrWsUrl;
+  }
+
+  /**
+   * Stop ASR WS and AudioWorklet. Does not touch WebRTC.
+   */
+  function stopAsrPipeline() {
+    if (state.pcmCapture) {
+      try {
+        state.pcmCapture.stop();
+      } catch (e) {}
+      state.pcmCapture = null;
+    }
+    if (state.asr) {
+      try {
+        state.asr.stop();
+      } catch (e) {}
+      state.asr = null;
+    }
+  }
+
+  /**
+   * Open ASR /v1/stream and pipe 16 kHz PCM. Failures only set a hint.
+   *
+   * @param {string} roomId
+   * @returns {Promise<void>}
+   */
+  async function startAsrPipeline(roomId) {
+    stopAsrPipeline();
+    const stream = state.localStream;
+    if (!stream || !stream.getAudioTracks().length) {
+      return;
+    }
+    let baseUrl;
+    try {
+      baseUrl = await loadAsrWsUrl();
+    } catch (e) {
+      setHint("Субтитры недоступны");
+      return;
+    }
+    const client = new window.RuTatAsr.AsrClient({
+      baseUrl: baseUrl,
+      token: function () {
+        return state.token;
+      },
+      micOn: function () {
+        return state.micOn;
+      },
+      onError: function (message) {
+        setHint(message);
+      },
+    });
+    const ok = await client.start(roomId);
+    if (!ok) {
+      setHint("Субтитры недоступны");
+      return;
+    }
+    state.asr = client;
+    try {
+      state.pcmCapture = await window.startPcmCapture(stream, function (samples) {
+        if (state.asr) {
+          state.asr.pushSamples(samples);
+        }
+      });
+    } catch (e) {
+      client.stop();
+      state.asr = null;
+      setHint("Субтитры недоступны");
+    }
   }
 
   function logout() {
     hideIncoming();
+    stopAsrPipeline();
     if (state.mesh) {
       state.mesh.disconnect();
       state.mesh = null;
@@ -386,6 +484,7 @@
 
   async function hangup() {
     hideIncoming();
+    stopAsrPipeline();
     if (state.mesh) {
       state.mesh.disconnect();
     }

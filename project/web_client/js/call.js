@@ -44,6 +44,7 @@
    * @param {function(string): void} hooks.onPeerLeft
    * @param {function(string, MediaStream): void} hooks.onRemoteStream
    * @param {function(string): void} hooks.onError
+   * @param {function(string): void} [hooks.onRoomReady] Room id after create or accept.
    */
   function MeshClient(hooks) {
     this._hooks = hooks;
@@ -158,6 +159,9 @@
   MeshClient.prototype.accept = function (roomId) {
     this.roomId = roomId;
     this.send("call.accept", { room_id: roomId });
+    if (this._hooks.onRoomReady) {
+      this._hooks.onRoomReady(roomId);
+    }
   };
 
   MeshClient.prototype.reject = function (roomId, reason) {
@@ -252,6 +256,9 @@
       invites.forEach(function (uid) {
         self.send("call.invite", { room_id: self.roomId, target_user_id: uid });
       });
+      if (this._hooks.onRoomReady) {
+        this._hooks.onRoomReady(this.roomId);
+      }
       return;
     }
     if (type === "call.invite") {
