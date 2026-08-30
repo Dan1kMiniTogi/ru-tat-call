@@ -11,6 +11,7 @@ from signaling_server.api import router
 from signaling_server.db import Database
 from signaling_server.internal import internal_router
 from signaling_server.rooms import RoomManager
+from signaling_server.static_site import mount_web_client
 from signaling_server.ws import ws_router
 
 
@@ -56,6 +57,8 @@ def create_app(settings: Optional[Settings] = None) -> FastAPI:
     def health() -> dict:
         """Liveness probe for local run and later Docker."""
         return {"ok": True}
+
+    mount_web_client(app, cfg.web_client_dir)
 
     return app
 
