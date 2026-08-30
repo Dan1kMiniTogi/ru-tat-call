@@ -20,6 +20,9 @@ from ru_tat_call_shared.contracts.signaling import (
     RoomCreatedEvent,
     RoomCreatedPayload,
     SignalingErrorEvent,
+    WebrtcAnswerEvent,
+    WebrtcIceEvent,
+    WebrtcOfferEvent,
     parse_signaling_message,
 )
 
@@ -31,8 +34,8 @@ def _now() -> int:
 
 
 def dump_message(model) -> dict:
-    """Serialize a signaling event to a JSON-ready dict."""
-    return model.model_dump(mode="json")
+    """Serialize a signaling event to a JSON-ready dict (ICE uses sdpMid aliases)."""
+    return model.model_dump(mode="json", by_alias=True)
 
 
 @dataclass
@@ -143,12 +146,14 @@ class RoomManager:
             await self._on_accept(user_id, msg)
         elif isinstance(msg, CallRejectEvent):
             await self._on_reject(user_id, msg)
+        elif isinstance(msg, (WebrtcOfferEvent, WebrtcAnswerEvent, WebrtcIceEvent)):
+            await self._on_webrtc(user_id, msg)
         else:
             await self.send_error(
                 user_id,
                 msg.request_id,
                 ErrorCode.INTERNAL_ERROR,
-                "WebRTC signaling is not enabled yet",
+                "Unsupported signaling event",
             )
 
     async def _on_room_create(self, user_id: str, msg: RoomCreateEvent) -> None:
@@ -263,6 +268,41 @@ class RoomManager:
         for member in set(room.members) | {room.owner_id}:
             if member != user_id:
                 await self.send(member, blob)
+
+    async def _on_webrtc(
+        self,
+        user_id: str,
+        msg: WebrtcOfferEvent | WebrtcAnswerEvent | WebrtcIceEvent,
+    ) -> None:
+        """Forward SDP/ICE to the peer if both are members of the room."""
+        room = self._rooms.get(msg.payload.room_id)
+        if room is None:
+            await self.send_error(
+                user_id, msg.request_id, ErrorCode.ROOM_NOT_FOUND, "Room not found"
+            )
+            return
+        if user_id not in room.members:
+            await self.send_error(
+                user_id, msg.request_id, ErrorCode.UNAUTHORIZED, "Not in this room"
+            )
+            return
+        if msg.payload.from_user_id != user_id:
+            await self.send_error(
+                user_id, msg.request_id, ErrorCode.UNAUTHORIZED, "from_user_id must match sender"
+            )
+            return
+        target = msg.payload.to_user_id
+        if target not in room.members:
+            await self.send_error(
+                user_id, msg.request_id, ErrorCode.UNAUTHORIZED, "Peer is not in this room"
+            )
+            return
+        if not self.is_online(target):
+            await self.send_error(
+                user_id, msg.request_id, ErrorCode.USER_OFFLINE, "Peer is offline"
+            )
+            return
+        await self.send(target, dump_message(msg))
 
     async def _leave_room(self, user_id: str, room_id: str) -> None:
         room = self._rooms.get(room_id)
