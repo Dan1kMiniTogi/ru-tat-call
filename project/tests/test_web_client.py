@@ -30,6 +30,13 @@ def test_index_and_assets(tmp_path: Path) -> None:
         assert "RTCPeerConnection" in mesh.text
         assert "sdpMid" in mesh.text
         assert "onRoomReady" in mesh.text
+        assert "subtitle.update" in mesh.text
+        subs = client.get("/js/subtitles.js")
+        assert subs.status_code == 200
+        assert "SubtitleStore" in subs.text
+        assert "subtitle-panel" in page.text
+        assert "subtitle-list" in css.text
+        assert "subtitles.js" in page.text
         pcm = client.get("/js/pcm.js")
         assert pcm.status_code == 200
         assert "downsampleTo16k" in pcm.text

@@ -49,6 +49,9 @@
       <section id="view-room" class="view view-room" data-view="room" hidden>
         <div id="video-grid" class="video-grid" aria-label="Сетка видео"></div>
         <p id="media-hint" class="media-hint" hidden></p>
+        <aside id="subtitle-panel" class="subtitle-panel" hidden>
+          <div id="subtitle-list" class="subtitle-list" role="log" aria-live="polite" aria-label="Субтитры"></div>
+        </aside>
         <nav class="call-bar" aria-label="Управление звонком">
           <button type="button" id="btn-mic" class="btn round" aria-pressed="true" aria-label="Микрофон">Мик</button>
           <button type="button" id="btn-cam" class="btn round" aria-pressed="true" aria-label="Камера">Кам</button>
@@ -64,6 +67,7 @@
       </div>
     </div>
     <script src="/js/pcm.js"></script>
+    <script src="/js/subtitles.js"></script>
     <script src="/js/asr.js"></script>
     <script src="/js/pcm-capture.js"></script>
     <script src="/js/call.js"></script>

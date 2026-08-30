@@ -245,6 +245,7 @@ input:focus-visible {
   flex-direction: column;
   height: 100dvh;
   padding-bottom: calc(96px + var(--pad-b));
+  position: relative;
 }
 
 .video-grid {
@@ -309,6 +310,54 @@ input:focus-visible {
   color: var(--muted);
   font-size: 0.85rem;
   text-align: center;
+}
+
+.subtitle-panel {
+  flex: 0 0 auto;
+  max-height: 28vh;
+  margin-top: 8px;
+  background: rgba(15, 20, 25, 0.88);
+  border-radius: 14px;
+  padding: 8px 10px;
+  pointer-events: auto;
+}
+
+.subtitle-list {
+  max-height: calc(28vh - 16px);
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  -webkit-overflow-scrolling: touch;
+}
+
+.subtitle-row {
+  margin: 0;
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: 0.92rem;
+  line-height: 1.35;
+}
+
+.subtitle-row.partial .subtitle-text {
+  color: #d5dee8;
+  font-style: italic;
+}
+
+.subtitle-row.final .subtitle-text {
+  color: var(--text);
+}
+
+.subtitle-badge {
+  flex: 0 0 auto;
+  background: var(--speaker, var(--accent));
+  color: #041018;
+  border-radius: 999px;
+  padding: 2px 8px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  font-style: normal;
 }
 
 @media (min-width: 720px) {

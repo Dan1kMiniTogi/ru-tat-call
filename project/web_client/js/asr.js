@@ -10,6 +10,7 @@
    * @param {function(): string} opts.token
    * @param {function(): boolean} opts.micOn
    * @param {function(string): void} [opts.onError]
+   * @param {function(object): void} [opts.onTranscript] asr.partial/final mapped payload
    */
   function AsrClient(opts) {
     this._opts = opts;
@@ -96,7 +97,29 @@
       ws.onclose = function () {
         self._started = false;
       };
-      ws.onmessage = function () {};
+      ws.onmessage = function (ev) {
+        let msg;
+        try {
+          msg = JSON.parse(ev.data);
+        } catch (e) {
+          return;
+        }
+        const type = msg.type;
+        if (type === "asr.error") {
+          if (self._opts.onError) {
+            self._opts.onError("Субтитры недоступны");
+          }
+          return;
+        }
+        if (self._opts.onTranscript && (type === "asr.partial" || type === "asr.final")) {
+          const mapped = root.RuTatSubtitles
+            ? root.RuTatSubtitles.fromAsrEvent(type, msg.payload || {})
+            : null;
+          if (mapped) {
+            self._opts.onTranscript(mapped);
+          }
+        }
+      };
     });
   };
 
