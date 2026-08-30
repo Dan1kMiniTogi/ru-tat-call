@@ -64,6 +64,7 @@ Auth: `Authorization: Bearer <access_token>`. Токены не логирова
 | `webrtc.offer` / `webrtc.answer` | | `room_id`, `from_user_id`, `to_user_id`, `sdp` |
 | `webrtc.ice` | | + `candidate` (`candidate`, `sdpMid`, `sdpMLineIndex`) |
 | `participant.joined` / `participant.left` | S→C | `room_id`, `user_id` |
+| `subtitle.update` | S→C | живые субтитры (ASR → `POST /v1/internal/subtitles`) |
 
 Сигнализация **не** носит аудио.
 

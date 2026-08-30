@@ -6,7 +6,7 @@
 
 Схема: аудио → буфер → нормализация (16 kHz mono PCM) → VAD (желательно) → окна с overlap → streaming inference → постобработка (дубли, склейка, пунктуация без агрессивной «правки» татарского, длина строк) → partial/final.
 
-Сейчас (шаг 2.1): сервис `asr_server` на порту **8001**, `GET /health`, WS `/v1/stream?token=`. Токен проверяется по SQLite signaling (`sessions`). События `asr.start` / `asr.audio` / `asr.stop`; PCM копится в памяти (потолок ~30 с). Распознавания и `subtitle.update` ещё нет (шаг 2.2).
+Сейчас (шаг 2.2): mock-движок по объёму PCM (~500 мс на шаг) отдаёт смешанные RU/TT фразы (`asr.partial` / `asr.final`) и шлёт `subtitle.update` в signaling (`POST /v1/internal/subtitles`, заголовок `X-Internal-Token` = `SECRET_KEY`). URL: `SIGNALING_INTERNAL_URL` (по умолчанию `http://127.0.0.1:8000`). Ошибка fan-out не рвёт ASR-стрим.
 
 Постобработка **не** должна: автопереводить, насильно «очищать» язык, ломать mixed-фразы.
 

@@ -7,14 +7,19 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from ru_tat_call_shared.config import Settings, get_settings
 
+from asr_server.publish import SubtitlePublisher, make_publisher
 from asr_server.ws import ws_router
 
 
-def create_app(settings: Optional[Settings] = None) -> FastAPI:
+def create_app(
+    settings: Optional[Settings] = None,
+    publisher: Optional[SubtitlePublisher] = None,
+) -> FastAPI:
     """Build the ASR app. Uvicorn target: `asr_server.app:app` on port 8001.
 
     Args:
         settings: Test override (same sqlite as signaling for tokens).
+        publisher: Test override for subtitle fan-out (default: HTTP or null).
 
     Example:
         create_app(Settings(_env_file=None, sqlite_path=tmp / "app.db"))
@@ -24,7 +29,9 @@ def create_app(settings: Optional[Settings] = None) -> FastAPI:
     @asynccontextmanager
     async def lifespan(app: FastAPI):
         app.state.settings = cfg
+        app.state.subtitle_publisher = make_publisher(cfg, publisher)
         yield
+        await app.state.subtitle_publisher.aclose()
 
     app = FastAPI(title="ru-tat-call asr", version="0.1.0", lifespan=lifespan)
     app.add_middleware(
