@@ -1,5 +1,7 @@
 """ASR streaming WebSocket: `/v1/stream?token=ACCESS_TOKEN`."""
 
+import asyncio
+
 from fastapi import APIRouter, Query, WebSocket, WebSocketDisconnect
 from pydantic import ValidationError
 from ru_tat_call_shared.contracts.asr import (
@@ -169,14 +171,21 @@ async def asr_stream(websocket: WebSocket, token: str = Query(...)) -> None:
                         speech_bytes=len(speech),
                     )
                 )
-                await _emit_transcripts(websocket, session, speaker_name, engine.feed(speech))
+                await _emit_transcripts(
+                    websocket,
+                    session,
+                    speaker_name,
+                    await asyncio.to_thread(engine.feed, speech),
+                )
             elif isinstance(msg, AsrStopEvent):
                 if session is None or engine is None:
                     await websocket.send_json(
                         _error(msg.session_id, ErrorCode.INTERNAL_ERROR, "No active session")
                     )
                     continue
-                await _emit_transcripts(websocket, session, speaker_name, engine.flush())
+                await _emit_transcripts(
+                    websocket, session, speaker_name, await asyncio.to_thread(engine.flush)
+                )
                 total = session.stop()
                 await websocket.send_json(
                     _info(

@@ -35,6 +35,7 @@ class Settings(BaseSettings):
         secret_key: HMAC/session secret; override in `.env` before any deploy.
         asr_engine: `mock` until a real engine is wired (step 2/4).
         asr_remote_url: Optional Colab/ngrok base URL for remote ASR.
+        asr_remote_token: Optional `X-Worker-Token` for the Colab worker.
         asr_onnx_path: Optional local ONNX checkpoint (step 4); empty uses mock.
         signaling_internal_url: Base URL ASR uses to POST `subtitle.update` into rooms.
         asr_vad: `silero` (CPU ONNX), `energy` (RMS fallback), or `off`.
@@ -59,6 +60,7 @@ class Settings(BaseSettings):
     secret_key: str = "dev-only-change-me"
     asr_engine: str = "mock"
     asr_remote_url: str = ""
+    asr_remote_token: str = ""
     asr_onnx_path: str = ""
     signaling_internal_url: str = "http://127.0.0.1:8000"
     asr_vad: str = "silero"

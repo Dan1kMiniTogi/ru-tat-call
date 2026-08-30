@@ -15,7 +15,7 @@
 
 ## Где мы сейчас
 
-Реализация живёт в `project/`. Шаг **4.1** закрыт (Colab ASR-воркер + туннель). Дальше **4.2** — коннектор `RemoteColabASREngine` к `POST /v1/transcribe`.
+Реализация живёт в `project/`. Шаг **4.2** закрыт (`RemoteColabASREngine` → Colab `POST /v1/transcribe`). Дальше **4.3** — бенчмарк задержки на mixed RU/TT.
 
 ## Тесты (сжато)
 

@@ -6,7 +6,7 @@
 
 Схема: аудио → буфер → нормализация (16 kHz mono PCM) → VAD (желательно) → окна с overlap → streaming inference → постобработка (дубли, склейка, пунктуация без агрессивной «правки» татарского, длина строк) → partial/final.
 
-Сейчас (шаг 4.1): Colab-воркер `project/apps/colab_asr/` (`POST /v1/transcribe`, ноутбук + ngrok/cloudflared). `ASREngine` на ноутбуке по-прежнему mock по умолчанию. `ASR_ENGINE=remote` + `ASR_REMOTE_URL` — заглушка до шага 4.2.
+Сейчас (шаг 4.2): `ASR_ENGINE=remote` + `ASR_REMOTE_URL` (туннель Colab) шлёт PCM на `POST /v1/transcribe`. Без URL остаётся mock. Воркер: `project/apps/colab_asr/`.
 
 Постобработка **не** должна: автопереводить, насильно «очищать» язык, ломать mixed-фразы.
 
