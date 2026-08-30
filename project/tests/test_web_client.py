@@ -60,7 +60,7 @@ def test_index_and_assets(tmp_path: Path) -> None:
         cfg = client.get("/v1/client-config")
         assert cfg.status_code == 200
         url = cfg.json()["asr_ws_url"]
-        assert url.endswith("/v1/stream")
-        assert ":8001/" in url or url.endswith(":8001/v1/stream")
+        assert url.endswith("/v1/asr-stream")
+        assert ":8001" not in url
         assert client.get("/health").json() == {"ok": True}
         assert client.get("/v1/users/me").status_code == 401

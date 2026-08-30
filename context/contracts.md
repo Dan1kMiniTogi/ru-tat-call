@@ -70,7 +70,7 @@ Auth: `Authorization: Bearer <access_token>`. Токены не логирова
 
 ## ASR WebSocket
 
-`wss://…/v1/stream?token=ACCESS_TOKEN`
+`wss://…/v1/stream?token=ACCESS_TOKEN` (процесс ASR, порт 8001) или с публичного origin `wss://…/v1/asr-stream?token=ACCESS_TOKEN` (прокси на signaling, шаг 5.2).
 
 Аудио: mono, 16 kHz, PCM s16le, короткие чанки. JSON+base64 — ок для MVP.
 

@@ -6,7 +6,7 @@
 
   /**
    * @param {object} opts
-   * @param {string} opts.baseUrl ws://host:8001/v1/stream (no query)
+   * @param {string} opts.baseUrl ws://host/v1/asr-stream (no query)
    * @param {function(): string} opts.token
    * @param {function(): boolean} opts.micOn
    * @param {function(string): void} [opts.onError]

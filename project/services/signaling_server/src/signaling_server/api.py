@@ -23,6 +23,7 @@ from ru_tat_call_shared.contracts.rest import (
 
 from signaling_server.db import Database
 from signaling_server.errors import api_error
+from signaling_server.public_urls import public_asr_ws_url
 
 router = APIRouter(prefix="/v1")
 _bearer = HTTPBearer(auto_error=False)
@@ -56,17 +57,14 @@ def current_user_id(
 def client_config(request: Request) -> ClientConfigResponse:
     """Public bootstrap for the SPA (ASR WebSocket URL).
 
-    Uses the request hostname so LAN phones hit the same host on ASR_PORT.
+    Same origin as the page (`/v1/asr-stream`), so one HTTPS tunnel covers UI,
+    signaling, and ASR. Override with `ASR_PUBLIC_WS_URL` if ASR is on another host.
 
     Example:
-        GET /v1/client-config → {"asr_ws_url": "ws://192.168.0.5:8001/v1/stream"}
+        GET /v1/client-config → {"asr_ws_url": "wss://host/v1/asr-stream"}
     """
     settings = request.app.state.settings
-    host = request.url.hostname or "127.0.0.1"
-    scheme = "wss" if request.url.scheme == "https" else "ws"
-    return ClientConfigResponse(
-        asr_ws_url=f"{scheme}://{host}:{settings.asr_port}/v1/stream"
-    )
+    return ClientConfigResponse(asr_ws_url=public_asr_ws_url(settings, request))
 
 
 @router.post("/auth/login", response_model=LoginResponse)
