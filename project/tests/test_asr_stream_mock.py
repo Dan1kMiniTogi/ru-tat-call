@@ -21,6 +21,7 @@ def _login(tmp_path: Path) -> tuple[Settings, str]:
         _env_file=None,
         sqlite_path=tmp_path / "mock.db",
         signaling_internal_url="",
+        asr_vad="off",
     )
     with TestClient(create_signaling_app(settings)) as client:
         token = client.post(
