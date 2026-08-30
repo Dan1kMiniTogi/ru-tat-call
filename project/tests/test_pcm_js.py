@@ -13,7 +13,15 @@ def test_pcm_js_syntax_and_downsample() -> None:
     if node is None:
         pytest.skip("node is not installed")
     js_dir = PROJECT_ROOT / "web_client" / "js"
-    for name in ("pcm.js", "asr.js", "pcm-capture.js", "pcm-worklet.js", "call.js", "app.js"):
+    for name in (
+        "pcm.js",
+        "asr.js",
+        "pcm-capture.js",
+        "pcm-worklet.js",
+        "call.js",
+        "app.js",
+        "subtitles.js",
+    ):
         subprocess.run([node, "--check", str(js_dir / name)], check=True)
     selftest = PROJECT_ROOT / "tests" / "js" / "pcm_selftest.js"
     result = subprocess.run(

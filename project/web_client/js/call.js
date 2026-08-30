@@ -45,6 +45,7 @@
    * @param {function(string, MediaStream): void} hooks.onRemoteStream
    * @param {function(string): void} hooks.onError
    * @param {function(string): void} [hooks.onRoomReady] Room id after create or accept.
+   * @param {function(object): void} [hooks.onSubtitle] subtitle.update payload.
    */
   function MeshClient(hooks) {
     this._hooks = hooks;
@@ -332,6 +333,12 @@
       try {
         await slot.pc.addIceCandidate(ice);
       } catch (e) {}
+      return;
+    }
+    if (type === "subtitle.update") {
+      if (this._hooks.onSubtitle) {
+        this._hooks.onSubtitle(payload);
+      }
     }
   };
 
