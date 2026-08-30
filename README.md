@@ -27,6 +27,7 @@ cd project
 uv sync --all-packages --group dev
 cp .env.example .env
 uv run uvicorn signaling_server.app:app --host 0.0.0.0 --port 8000
+# или: docker compose -f infra/docker-compose.yml up --build
 ```
 
 Ветка `develop` — повседневная работа. `main` — только стабильный MVP.

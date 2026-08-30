@@ -68,5 +68,5 @@
 
 - [x] **Шаг 5.1**: Логика реконнекта (WebSocket backoff, WebRTC ICE restart, ASR fallback без обрыва звонка).
 - [x] **Шаг 5.2**: Настройка Cloudflare Tunnel / ngrok для публичного HTTPS доступа с iPhone Safari и Android Chrome.
-- [ ] **Шаг 5.3**: Dockerfile и `docker-compose.yml` для единого запуска бэкенда.
+- [x] **Шаг 5.3**: Dockerfile и `docker-compose.yml` для единого запуска бэкенда.
 - [ ] **Шаг 5.4**: Финальное нагрузочное тестирование и чеклист готовности MVP.

@@ -9,4 +9,4 @@ Mobile-first SPA: вход, контакты, комната 2×2, WebRTC, PCM �
 
 Автотест двух «вкладок»: `uv run pytest tests/test_e2e_call_subtitles.py`.
 
-В браузере (по желанию): оба сервера → две вкладки, разные логины → звонок → лента mock-субтитров. Если ASR не запущен, звонок жив. Камера на телефоне: HTTPS через `./infra/tunnel.sh` (см. `project/infra/README.md`).
+В браузере (по желанию): оба сервера или `docker compose -f infra/docker-compose.yml up --build` → две вкладки, разные логины → звонок. Если ASR не запущен, звонок жив. Камера на телефоне: HTTPS через `./infra/tunnel.sh` (см. `project/infra/README.md`).
