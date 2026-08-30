@@ -6,7 +6,7 @@
 
 Схема: аудио → буфер → нормализация (16 kHz mono PCM) → VAD (желательно) → окна с overlap → streaming inference → постобработка (дубли, склейка, пунктуация без агрессивной «правки» татарского, длина строк) → partial/final.
 
-Сейчас (шаг 2.3): перед mock стоит VAD. По умолчанию **Silero** на CPU (`silero-vad-lite`, ONNX, без PyTorch). Тишина не крутит mock. `ASR_VAD=energy|off` для отладки; если Silero не загрузился — fallback на RMS energy. Окно 32 мс / 512 сэмплов @ 16 kHz.
+Сейчас (шаг 2.4): интерфейс `ASREngine` (`feed` / `flush`). По умолчанию mock. `ASR_ENGINE=remote` + `ASR_REMOTE_URL` и `ASR_ENGINE=local` + `ASR_ONNX_PATH` — заглушки под Colab/ONNX (шаг 4); без URL/пути остаётся mock. Перед движком — VAD (Silero).
 
 Постобработка **не** должна: автопереводить, насильно «очищать» язык, ломать mixed-фразы.
 

@@ -34,7 +34,7 @@ def _login_token(tmp_path: Path) -> tuple[Settings, str]:
 def test_health(tmp_path: Path) -> None:
     settings = _settings(tmp_path, "empty.db")
     with TestClient(create_asr_app(settings)) as client:
-        assert client.get("/health").json() == {"ok": True, "role": "asr"}
+        assert client.get("/health").json() == {"ok": True, "role": "asr", "engine": "mock"}
 
 
 def test_invalid_token(tmp_path: Path) -> None:
