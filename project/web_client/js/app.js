@@ -1,6 +1,5 @@
 /**
- * Mobile-first call UI (step 3.1): login, contacts, 2x2 room, mic/camera.
- * WebRTC mesh is step 3.2 — here only local getUserMedia preview.
+ * Mobile-first call UI: login, contacts, 2x2 room, WebRTC mesh (step 3.2).
  */
 (function () {
   const DEMO_USERS = [
@@ -22,9 +21,13 @@
     me: null,
     contacts: [],
     selectedIds: new Set(),
+    remoteIds: [],
+    remoteStreams: {},
     localStream: null,
     micOn: true,
     camOn: true,
+    pendingInvite: null,
+    mesh: null,
   };
 
   /**
@@ -33,8 +36,6 @@
    * @param {string} identifier Login (`you`, `mama`, `sister`).
    * @param {string} password Demo password is `family`.
    * @returns {Promise<{access_token: string, user_id: string}>}
-   * @example
-   * const session = await apiLogin("you", "family");
    */
   async function apiLogin(identifier, password) {
     const res = await fetch("/v1/auth/login", {
@@ -87,24 +88,99 @@
     });
   }
 
-  /**
-   * Parse FastAPI error payload `{detail: {code, message}}`.
-   *
-   * @param {unknown} detail
-   * @returns {string|undefined}
-   */
-  function errorMessage(detail) {
-    if (detail && typeof detail === "object" && detail.message) {
-      return detail.message;
+  function displayName(userId) {
+    if (state.me && userId === state.me.user_id) {
+      return state.me.display_name;
     }
-    return undefined;
+    const hit = state.contacts.find(function (c) {
+      return c.user_id === userId;
+    });
+    return (hit && hit.display_name) || userId;
+  }
+
+  function setHint(text) {
+    const hint = document.getElementById("media-hint");
+    if (!text) {
+      hint.hidden = true;
+      hint.textContent = "";
+      return;
+    }
+    hint.textContent = text;
+    hint.hidden = false;
+  }
+
+  function hideIncoming() {
+    document.getElementById("incoming-call").hidden = true;
+    state.pendingInvite = null;
+  }
+
+  function showIncoming(payload) {
+    state.pendingInvite = payload;
+    document.getElementById("incoming-text").textContent = "Входящий звонок";
+    document.getElementById("incoming-call").hidden = false;
+  }
+
+  /**
+   * Create MeshClient bound to current token/me/localStream.
+   *
+   * @returns {object}
+   */
+  function createMesh() {
+    return new window.RuTatMesh.MeshClient({
+      token: function () {
+        return state.token;
+      },
+      me: function () {
+        return state.me;
+      },
+      localStream: function () {
+        return state.localStream;
+      },
+      onInvite: function (payload) {
+        if (views.room.hidden === false) {
+          state.mesh.reject(payload.room_id, "busy");
+          return;
+        }
+        showIncoming(payload);
+      },
+      onPeerJoined: function (userId) {
+        if (state.remoteIds.indexOf(userId) === -1) {
+          state.remoteIds.push(userId);
+        }
+        renderGrid();
+      },
+      onPeerLeft: function (userId) {
+        state.remoteIds = state.remoteIds.filter(function (id) {
+          return id !== userId;
+        });
+        delete state.remoteStreams[userId];
+        renderGrid();
+      },
+      onRemoteStream: function (userId, stream) {
+        state.remoteStreams[userId] = stream;
+        if (state.remoteIds.indexOf(userId) === -1) {
+          state.remoteIds.push(userId);
+        }
+        renderGrid();
+      },
+      onError: function (message) {
+        setHint(message);
+      },
+    });
   }
 
   function logout() {
+    hideIncoming();
+    if (state.mesh) {
+      state.mesh.disconnect();
+      state.mesh = null;
+    }
     stopLocalMedia();
     state.token = "";
     state.me = null;
     state.contacts = [];
+    state.remoteIds = [];
+    state.remoteStreams = {};
     sessionStorage.removeItem(TOKEN_KEY);
     document.getElementById("login-error").hidden = true;
     showView("login");
@@ -146,16 +222,14 @@
   }
 
   /**
-   * Request camera+mic for the self tile. Failures keep the call UI (ASR/call rule analog).
+   * Request camera+mic for the self tile.
    *
    * @returns {Promise<void>}
    */
   async function startLocalPreview() {
-    const hint = document.getElementById("media-hint");
-    hint.hidden = true;
+    setHint("");
     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-      hint.textContent = "Камера недоступна в этом браузере. Сетка всё равно открыта.";
-      hint.hidden = false;
+      setHint("Камера недоступна в этом браузере. Звонок всё равно можно начать.");
       return;
     }
     try {
@@ -164,32 +238,32 @@
         video: { facingMode: "user" },
       });
     } catch (err) {
-      hint.textContent = "Нет доступа к камере/микрофону — можно продолжить без превью.";
-      hint.hidden = false;
+      setHint("Нет доступа к камере/микрофону — P2P без своего видео.");
       return;
     }
+    attachLocalVideo();
+    syncMediaButtons();
+  }
+
+  function attachLocalVideo() {
     const video = document.getElementById("local-video");
-    if (video) {
+    if (video && state.localStream) {
       video.srcObject = state.localStream;
       video.muted = true;
       video.playsInline = true;
       video.play().catch(function () {});
     }
-    syncMediaButtons();
   }
 
   /**
-   * Render 2x2 tiles: self + selected contacts + empty slots (max 4).
+   * Render 2x2 tiles: self + remotes with live streams + empty slots.
    */
   function renderGrid() {
     const grid = document.getElementById("video-grid");
     grid.innerHTML = "";
-    const others = state.contacts.filter(function (c) {
-      return state.selectedIds.has(c.user_id);
-    });
     const slots = [{ kind: "self", name: (state.me && state.me.display_name) || "Вы" }];
-    others.slice(0, MAX_TILES - 1).forEach(function (c) {
-      slots.push({ kind: "remote", name: c.display_name });
+    state.remoteIds.slice(0, MAX_TILES - 1).forEach(function (id) {
+      slots.push({ kind: "remote", userId: id, name: displayName(id) });
     });
     while (slots.length < MAX_TILES) {
       slots.push({ kind: "empty", name: "Свободно" });
@@ -204,10 +278,19 @@
         video.muted = true;
         video.setAttribute("playsinline", "");
         tile.appendChild(video);
+      } else if (slot.kind === "remote") {
+        const video = document.createElement("video");
+        video.id = "remote-" + slot.userId;
+        video.autoplay = true;
+        video.setAttribute("playsinline", "");
+        if (state.remoteStreams[slot.userId]) {
+          video.srcObject = state.remoteStreams[slot.userId];
+        }
+        tile.appendChild(video);
       } else {
         const ph = document.createElement("div");
         ph.className = "placeholder";
-        ph.textContent = slot.kind === "empty" ? "Ожидание участника" : "Нет видео (шаг 3.2)";
+        ph.textContent = "Ожидание участника";
         tile.appendChild(ph);
       }
       const badge = document.createElement("span");
@@ -216,6 +299,14 @@
       tile.appendChild(badge);
       tile.dataset.slot = String(index);
       grid.appendChild(tile);
+    });
+    attachLocalVideo();
+    state.remoteIds.forEach(function (id) {
+      const el = document.getElementById("remote-" + id);
+      if (el && state.remoteStreams[id]) {
+        el.srcObject = state.remoteStreams[id];
+        el.play().catch(function () {});
+      }
     });
   }
 
@@ -251,6 +342,13 @@
     });
   }
 
+  async function ensureMesh() {
+    if (!state.mesh) {
+      state.mesh = createMesh();
+    }
+    await state.mesh.connect();
+  }
+
   async function enterHome() {
     state.me = await apiGet("/v1/users/me");
     const contacts = await apiGet("/v1/contacts");
@@ -258,12 +356,50 @@
     document.getElementById("home-name").textContent = state.me.display_name;
     renderContacts();
     showView("home");
+    await ensureMesh();
   }
 
-  async function enterRoom() {
+  async function enterRoomAsCaller() {
+    state.remoteIds = [];
+    state.remoteStreams = {};
     renderGrid();
     showView("room");
     await startLocalPreview();
+    renderGrid();
+    const ids = [state.me.user_id].concat(Array.from(state.selectedIds));
+    const invites = Array.from(state.selectedIds);
+    if (!state.mesh || !state.mesh.ws || state.mesh.ws.readyState !== WebSocket.OPEN) {
+      throw new Error("Нет сигнализации — обновите страницу");
+    }
+    state.mesh.startCall(ids, invites);
+  }
+
+  async function enterRoomAsCallee(roomId) {
+    state.remoteIds = [];
+    state.remoteStreams = {};
+    renderGrid();
+    showView("room");
+    await startLocalPreview();
+    renderGrid();
+    state.mesh.accept(roomId);
+  }
+
+  async function hangup() {
+    hideIncoming();
+    if (state.mesh) {
+      state.mesh.disconnect();
+    }
+    stopLocalMedia();
+    state.remoteIds = [];
+    state.remoteStreams = {};
+    setHint("");
+    showView("home");
+    state.mesh = createMesh();
+    try {
+      await state.mesh.connect();
+    } catch (e) {
+      setHint("Не удалось заново открыть сигнализацию");
+    }
   }
 
   function bindLoginChips() {
@@ -295,18 +431,19 @@
       sessionStorage.setItem(TOKEN_KEY, state.token);
       await enterHome();
     } catch (ex) {
-      err.textContent = errorMessage(ex.detail) || ex.message || "Ошибка входа";
+      err.textContent = ex.message || "Ошибка входа";
       err.hidden = false;
     }
   });
 
   document.getElementById("btn-logout").addEventListener("click", logout);
   document.getElementById("btn-start-call").addEventListener("click", function () {
-    enterRoom().catch(function () {});
+    enterRoomAsCaller().catch(function (e) {
+      setHint(e.message || "Не удалось начать звонок");
+    });
   });
   document.getElementById("btn-hangup").addEventListener("click", function () {
-    stopLocalMedia();
-    showView("home");
+    hangup().catch(function () {});
   });
   document.getElementById("btn-mic").addEventListener("click", function () {
     state.micOn = !state.micOn;
@@ -315,6 +452,23 @@
   document.getElementById("btn-cam").addEventListener("click", function () {
     state.camOn = !state.camOn;
     syncMediaButtons();
+  });
+  document.getElementById("btn-accept").addEventListener("click", function () {
+    const payload = state.pendingInvite;
+    hideIncoming();
+    if (!payload) {
+      return;
+    }
+    enterRoomAsCallee(payload.room_id).catch(function (e) {
+      setHint(e.message || "Не удалось принять звонок");
+    });
+  });
+  document.getElementById("btn-reject").addEventListener("click", function () {
+    const payload = state.pendingInvite;
+    hideIncoming();
+    if (payload && state.mesh) {
+      state.mesh.reject(payload.room_id, "declined");
+    }
   });
 
   bindLoginChips();
