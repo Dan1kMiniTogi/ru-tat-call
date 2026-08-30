@@ -1,6 +1,6 @@
 # asr_server
 
-Потоковый ASR: VAD → `ASREngine` (`mock` / заглушки `remote` и `local`).
+Потоковый ASR: VAD → `ASREngine` → `TranscriptSmoother` (склейка / дедуп / точка на final).
 
 ```bash
 cd project
