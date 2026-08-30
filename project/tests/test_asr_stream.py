@@ -11,9 +11,18 @@ from asr_server.app import create_app as create_asr_app
 from signaling_server.app import create_app as create_signaling_app
 
 
+def _settings(tmp_path: Path, name: str = "asr.db") -> Settings:
+    """Shared sqlite + no HTTP fan-out (tests inject a publisher when needed)."""
+    return Settings(
+        _env_file=None,
+        sqlite_path=tmp_path / name,
+        signaling_internal_url="",
+    )
+
+
 def _login_token(tmp_path: Path) -> tuple[Settings, str]:
     """Create the shared SQLite DB via signaling login and return (settings, token)."""
-    settings = Settings(_env_file=None, sqlite_path=tmp_path / "asr.db")
+    settings = _settings(tmp_path)
     with TestClient(create_signaling_app(settings)) as client:
         token = client.post(
             "/v1/auth/login", json={"identifier": "you", "password": "family"}
@@ -22,13 +31,13 @@ def _login_token(tmp_path: Path) -> tuple[Settings, str]:
 
 
 def test_health(tmp_path: Path) -> None:
-    settings = Settings(_env_file=None, sqlite_path=tmp_path / "empty.db")
+    settings = _settings(tmp_path, "empty.db")
     with TestClient(create_asr_app(settings)) as client:
         assert client.get("/health").json() == {"ok": True, "role": "asr"}
 
 
 def test_invalid_token(tmp_path: Path) -> None:
-    settings = Settings(_env_file=None, sqlite_path=tmp_path / "none.db")
+    settings = _settings(tmp_path, "none.db")
     with TestClient(create_asr_app(settings)) as client:
         with client.websocket_connect("/v1/stream?token=not-a-session") as ws:
             err = ws.receive_json()

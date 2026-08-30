@@ -35,6 +35,7 @@ class Settings(BaseSettings):
         secret_key: HMAC/session secret; override in `.env` before any deploy.
         asr_engine: `mock` until a real engine is wired (step 2/4).
         asr_remote_url: Optional Colab/ngrok base URL for remote ASR.
+        signaling_internal_url: Base URL ASR uses to POST `subtitle.update` into rooms.
         max_participants: Hard cap for a room (product MVP: 4).
     """
 
@@ -55,6 +56,7 @@ class Settings(BaseSettings):
     secret_key: str = "dev-only-change-me"
     asr_engine: str = "mock"
     asr_remote_url: str = ""
+    signaling_internal_url: str = "http://127.0.0.1:8000"
     max_participants: int = Field(default=4, ge=2, le=4)
 
     @field_validator("sqlite_path", "web_client_dir", mode="before")

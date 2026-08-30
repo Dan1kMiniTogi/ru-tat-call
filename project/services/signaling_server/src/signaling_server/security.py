@@ -47,3 +47,23 @@ def verify_password(password: str, stored: str) -> bool:
 def new_token() -> str:
     """URL-safe random token for access/refresh/group ids."""
     return secrets.token_urlsafe(32)
+
+
+def tokens_match(got: str, expected: str) -> bool:
+    """Constant-time compare for internal shared secrets.
+
+    Args:
+        got: Token from `X-Internal-Token`.
+        expected: `SECRET_KEY` from settings.
+
+    Returns:
+        True if both strings are equal.
+
+    Example:
+        tokens_match("dev-only-change-me", settings.secret_key)
+    """
+    a = got.encode("utf-8")
+    b = expected.encode("utf-8")
+    if len(a) != len(b):
+        return False
+    return hmac.compare_digest(a, b)

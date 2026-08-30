@@ -40,3 +40,32 @@ def user_id_for_token(sqlite_path: Path, access_token: str) -> Optional[str]:
     if expires < datetime.now(timezone.utc):
         return None
     return row["user_id"]
+
+
+def display_name_for_user(sqlite_path: Path, user_id: str) -> str:
+    """Return the user's display_name, or user_id if the row is missing.
+
+    Args:
+        sqlite_path: Same DB as signaling.
+        user_id: Authenticated speaker id.
+
+    Returns:
+        Display name for subtitle speaker_name.
+
+    Example:
+        display_name_for_user(Path("data/app.db"), "u_you")
+    """
+    if not sqlite_path.is_file():
+        return user_id
+    conn = sqlite3.connect(str(sqlite_path))
+    conn.row_factory = sqlite3.Row
+    try:
+        row = conn.execute(
+            "SELECT display_name FROM users WHERE user_id = ?",
+            (user_id,),
+        ).fetchone()
+    finally:
+        conn.close()
+    if row is None or not row["display_name"]:
+        return user_id
+    return row["display_name"]
