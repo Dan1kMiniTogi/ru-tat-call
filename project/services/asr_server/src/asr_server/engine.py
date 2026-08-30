@@ -113,9 +113,9 @@ def build_asr_engine(settings: Settings, start: AsrStartPayload) -> ASREngine:
 
 
 class RemoteColabASREngine:
-    """Placeholder for step 4.2: HTTP worker behind ngrok/cloudflared.
+    """Placeholder until step 4.2 POSTs to the Colab worker from 4.1.
 
-    Planned worker contract (not called until 4.2 fills `feed`):
+    Worker: `project/apps/colab_asr/worker.py`
     `POST {base_url}/v1/transcribe` JSON `{audio_base64, sample_rate, encoding}`
     → `{text, language, is_final}`. Failures must return [] (call stays up).
 

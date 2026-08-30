@@ -1,3 +1,3 @@
 # tests
 
-Сквозные сценарии: контракты, config, REST, WebSocket (2 и 3 клиента, лимит комнаты).
+Сквозные сценарии: контракты, config, REST, WebSocket, e2e субтитры, Colab ASR worker (dummy).
