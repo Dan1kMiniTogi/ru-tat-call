@@ -37,7 +37,7 @@
 
 - [x] **Шаг 2.1**: WebSocket endpoint `/v1/stream` для ASR: прием `asr.start`, `asr.audio` (PCM 16kHz s16le), буферизация.
 - [x] **Шаг 2.2**: Mock-движок распознавания (генерация тестовых partial/final субтитров) и рассылка `subtitle.update`.
-- [ ] **Шаг 2.3**: Интеграция VAD (Voice Activity Detection через Silero VAD на CPU) для фильтрации тишины.
+- [x] **Шаг 2.3**: Интеграция VAD (Voice Activity Detection через Silero VAD на CPU) для фильтрации тишины.
 - [ ] **Шаг 2.4**: Абстрактный интерфейс `ASREngine` (готовый к подключению Colab GPU туннеля или локального ONNX).
 
 ---

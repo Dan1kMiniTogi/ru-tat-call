@@ -55,6 +55,7 @@ class AsrInfoPayload(ApiModel):
     version: Optional[str] = None
     chunk_bytes: Optional[int] = None
     buffered_bytes: Optional[int] = None
+    speech_bytes: Optional[int] = None
 
 
 class AsrErrorPayload(ApiModel):

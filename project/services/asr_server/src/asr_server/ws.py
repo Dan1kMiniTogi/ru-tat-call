@@ -18,6 +18,7 @@ from ru_tat_call_shared.config import Settings
 from asr_server.auth import display_name_for_user, user_id_for_token
 from asr_server.buffer import AudioFormatError, StreamSession
 from asr_server.mock_engine import MockEngine, MockUtterance, to_asr_event, to_subtitle_event
+from asr_server.vad import SpeechGate, build_speech_gate
 
 ws_router = APIRouter()
 
@@ -44,6 +45,7 @@ def _info(
     version: str | None = None,
     chunk_bytes: int | None = None,
     buffered_bytes: int | None = None,
+    speech_bytes: int | None = None,
 ) -> dict:
     return _dump(
         AsrInfoEvent(
@@ -55,6 +57,7 @@ def _info(
                 version=version,
                 chunk_bytes=chunk_bytes,
                 buffered_bytes=buffered_bytes,
+                speech_bytes=speech_bytes,
             ),
         )
     )
@@ -93,6 +96,7 @@ async def asr_stream(websocket: WebSocket, token: str = Query(...)) -> None:
 
     Client → server: `asr.start`, `asr.audio` (16 kHz mono pcm_s16le), `asr.stop`.
     Server → client: `asr.info`, `asr.partial`, `asr.final`, or `asr.error`.
+    VAD (`ASR_VAD=silero|energy|off`) drops silence before the mock engine.
     Signaling members also get `subtitle.update` via `SIGNALING_INTERNAL_URL`.
 
     Example:
@@ -108,6 +112,7 @@ async def asr_stream(websocket: WebSocket, token: str = Query(...)) -> None:
 
     session: StreamSession | None = None
     engine: MockEngine | None = None
+    gate: SpeechGate | None = None
     speaker_name = display_name_for_user(settings.sqlite_path, user_id)
     try:
         while True:
@@ -129,6 +134,8 @@ async def asr_stream(websocket: WebSocket, token: str = Query(...)) -> None:
                     return_partial=msg.payload.return_partial,
                     return_final=msg.payload.return_final,
                 )
+                gate, vad_name = build_speech_gate(settings.asr_vad, settings.asr_vad_threshold)
+                gate.reset()
                 if msg.payload.speaker_labels:
                     speaker_name = display_name_for_user(settings.sqlite_path, user_id)
                 else:
@@ -138,11 +145,11 @@ async def asr_stream(websocket: WebSocket, token: str = Query(...)) -> None:
                         msg.session_id,
                         "session_started",
                         model_name="mock",
-                        version="0.1",
+                        version=vad_name,
                     )
                 )
             elif isinstance(msg, AsrAudioEvent):
-                if session is None or engine is None or session.session_id != msg.session_id:
+                if session is None or engine is None or gate is None or session.session_id != msg.session_id:
                     await websocket.send_json(
                         _error(msg.session_id, ErrorCode.INTERNAL_ERROR, "Call asr.start first")
                     )
@@ -154,15 +161,17 @@ async def asr_stream(websocket: WebSocket, token: str = Query(...)) -> None:
                         _error(msg.session_id, ErrorCode.INVALID_AUDIO_FORMAT, str(exc))
                     )
                     continue
+                speech_n = gate.feed(session.last_chunk)
                 await websocket.send_json(
                     _info(
                         msg.session_id,
                         "chunk_buffered",
                         chunk_bytes=added,
                         buffered_bytes=len(session.pcm),
+                        speech_bytes=speech_n,
                     )
                 )
-                await _emit_mock(websocket, session, speaker_name, engine.feed(added))
+                await _emit_mock(websocket, session, speaker_name, engine.feed(speech_n))
             elif isinstance(msg, AsrStopEvent):
                 if session is None or engine is None:
                     await websocket.send_json(
@@ -181,6 +190,7 @@ async def asr_stream(websocket: WebSocket, token: str = Query(...)) -> None:
                 )
                 session = None
                 engine = None
+                gate = None
             else:
                 await websocket.send_json(
                     _error(msg.session_id, ErrorCode.INTERNAL_ERROR, "Unexpected ASR event from client")

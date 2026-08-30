@@ -17,6 +17,7 @@ def _settings(tmp_path: Path, name: str = "asr.db") -> Settings:
         _env_file=None,
         sqlite_path=tmp_path / name,
         signaling_internal_url="",
+        asr_vad="off",
     )
 
 

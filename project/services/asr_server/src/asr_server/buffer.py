@@ -40,6 +40,7 @@ class StreamSession:
     language_mode: str = "auto"
     started: bool = False
     pcm: bytearray = field(default_factory=bytearray)
+    last_chunk: bytes = b""
 
     def start(self, payload: AsrStartPayload) -> None:
         """Mark the session started and reset the PCM buffer."""
@@ -47,6 +48,7 @@ class StreamSession:
         self.language_mode = payload.language_mode.value
         self.started = True
         self.pcm.clear()
+        self.last_chunk = b""
 
     def append_audio(self, payload: AsrAudioPayload) -> int:
         """Decode and append one audio chunk.
@@ -80,11 +82,13 @@ class StreamSession:
         if len(self.pcm) + len(raw) > MAX_BUFFER_BYTES:
             raise AudioFormatError("PCM buffer overflow")
         self.pcm.extend(raw)
+        self.last_chunk = raw
         return len(raw)
 
     def stop(self) -> int:
         """Clear the buffer. Returns bytes that were buffered."""
         n = len(self.pcm)
         self.pcm.clear()
+        self.last_chunk = b""
         self.started = False
         return n
