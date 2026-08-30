@@ -529,6 +529,8 @@ dependencies = [
     { name = "httpx" },
     { name = "ru-tat-call-shared" },
     { name = "uvicorn", extra = ["standard"] },
+    { name = "websockets", version = "16.1.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },
+    { name = "websockets", version = "17.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11'" },
 ]
 
 [package.metadata]
@@ -537,6 +539,7 @@ requires-dist = [
     { name = "httpx", specifier = ">=0.27" },
     { name = "ru-tat-call-shared", editable = "shared" },
     { name = "uvicorn", extras = ["standard"], specifier = ">=0.32" },
+    { name = "websockets", specifier = ">=12" },
 ]
 
 [[package]]

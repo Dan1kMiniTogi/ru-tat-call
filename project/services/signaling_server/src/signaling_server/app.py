@@ -8,6 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from ru_tat_call_shared.config import Settings, get_settings
 
 from signaling_server.api import router
+from signaling_server.asr_proxy import asr_proxy_router
 from signaling_server.db import Database
 from signaling_server.internal import internal_router
 from signaling_server.rooms import RoomManager
@@ -58,6 +59,7 @@ def create_app(settings: Optional[Settings] = None) -> FastAPI:
     app.include_router(router)
     app.include_router(internal_router)
     app.include_router(ws_router)
+    app.include_router(asr_proxy_router)
 
     @app.get("/health")
     def health() -> dict:
