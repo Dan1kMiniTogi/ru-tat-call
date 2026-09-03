@@ -1,5 +1,5 @@
 /**
- * Mobile-first call UI: login, contacts, 2x2 room, WebRTC mesh + ASR PCM (step 3.3).
+ * Mobile-first call UI: login, contacts, 2x2 room, WebRTC, ASR PCM, live subtitles (step 3.4).
  */
 (function () {
   const DEMO_USERS = [
@@ -31,6 +31,7 @@
     asrWsUrl: "",
     asr: null,
     pcmCapture: null,
+    subtitles: null,
   };
 
   /**
@@ -169,10 +170,18 @@
       onError: function (message) {
         setHint(message);
       },
+      onStatus: function (message) {
+        setHint(message);
+      },
       onRoomReady: function (roomId) {
         startAsrPipeline(roomId).catch(function () {
           setHint("Субтитры недоступны");
         });
+      },
+      onSubtitle: function (payload) {
+        if (state.subtitles) {
+          state.subtitles.apply(payload);
+        }
       },
     });
   }
@@ -246,13 +255,17 @@
       onError: function (message) {
         setHint(message);
       },
+      onTranscript: function (payload) {
+        if (state.subtitles) {
+          state.subtitles.apply(payload);
+        }
+      },
     });
+    state.asr = client;
     const ok = await client.start(roomId);
     if (!ok) {
       setHint("Субтитры недоступны");
-      return;
     }
-    state.asr = client;
     try {
       state.pcmCapture = await window.startPcmCapture(stream, function (samples) {
         if (state.asr) {
@@ -269,6 +282,7 @@
   function logout() {
     hideIncoming();
     stopAsrPipeline();
+    clearSubtitles();
     if (state.mesh) {
       state.mesh.disconnect();
       state.mesh = null;
@@ -447,6 +461,27 @@
     await state.mesh.connect();
   }
 
+  /**
+   * Bind the overlay once; DOM nodes live in the room view.
+   *
+   * @returns {object}
+   */
+  function ensureSubtitleWidget() {
+    if (!state.subtitles) {
+      state.subtitles = new window.RuTatSubtitles.SubtitleWidget(
+        document.getElementById("subtitle-list"),
+        document.getElementById("subtitle-panel")
+      );
+    }
+    return state.subtitles;
+  }
+
+  function clearSubtitles() {
+    if (state.subtitles) {
+      state.subtitles.clear();
+    }
+  }
+
   async function enterHome() {
     state.me = await apiGet("/v1/users/me");
     const contacts = await apiGet("/v1/contacts");
@@ -458,6 +493,7 @@
   }
 
   async function enterRoomAsCaller() {
+    ensureSubtitleWidget().clear();
     state.remoteIds = [];
     state.remoteStreams = {};
     renderGrid();
@@ -473,6 +509,7 @@
   }
 
   async function enterRoomAsCallee(roomId) {
+    ensureSubtitleWidget().clear();
     state.remoteIds = [];
     state.remoteStreams = {};
     renderGrid();
@@ -485,6 +522,7 @@
   async function hangup() {
     hideIncoming();
     stopAsrPipeline();
+    clearSubtitles();
     if (state.mesh) {
       state.mesh.disconnect();
     }
@@ -571,6 +609,7 @@
   });
 
   bindLoginChips();
+  ensureSubtitleWidget();
   if (state.token) {
     enterHome().catch(function () {
       logout();

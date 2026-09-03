@@ -77,11 +77,12 @@ def test_groups_and_settings(tmp_path: Path) -> None:
 
 
 def test_client_config_asr_ws_url(tmp_path: Path) -> None:
-    """GET /v1/client-config is public and points at ASR_PORT on the request host."""
+    """GET /v1/client-config is public and uses same-origin /v1/asr-stream."""
     settings = Settings(_env_file=None, sqlite_path=tmp_path / "cfg.db", asr_port=8001)
     with TestClient(create_app(settings)) as client:
         res = client.get("/v1/client-config")
         assert res.status_code == 200
         url = res.json()["asr_ws_url"]
         assert url.startswith("ws://")
-        assert url.endswith(":8001/v1/stream")
+        assert url.endswith("/v1/asr-stream")
+        assert ":8001" not in url

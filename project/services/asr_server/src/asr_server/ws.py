@@ -1,5 +1,7 @@
 """ASR streaming WebSocket: `/v1/stream?token=ACCESS_TOKEN`."""
 
+import asyncio
+
 from fastapi import APIRouter, Query, WebSocket, WebSocketDisconnect
 from pydantic import ValidationError
 from ru_tat_call_shared.contracts.asr import (
@@ -18,6 +20,7 @@ from ru_tat_call_shared.config import Settings
 from asr_server.auth import display_name_for_user, user_id_for_token
 from asr_server.buffer import AudioFormatError, StreamSession
 from asr_server.engine import ASREngine, TranscriptUtterance, build_asr_engine, to_asr_event, to_subtitle_event
+from asr_server.postprocess import TranscriptSmoother
 from asr_server.vad import SpeechGate, build_speech_gate
 
 ws_router = APIRouter()
@@ -68,6 +71,7 @@ async def _emit_transcripts(
     session: StreamSession,
     speaker_name: str,
     utterances: list[TranscriptUtterance],
+    smoother: TranscriptSmoother,
 ) -> None:
     """Send asr.partial/final and try to fan-out subtitle.update.
 
@@ -76,14 +80,18 @@ async def _emit_transcripts(
         session: Active stream (room_id, user_id, session_id).
         speaker_name: Label for the overlay (may be empty).
         utterances: Steps from the active ASREngine.
+        smoother: Per-session glue / de-dupe / light punct.
     """
     publisher = websocket.app.state.subtitle_publisher
     for utt in utterances:
+        cleaned = smoother.apply(utt)
+        if cleaned is None:
+            continue
         await websocket.send_json(
-            _dump(to_asr_event(session.session_id, session.user_id, speaker_name, utt))
+            _dump(to_asr_event(session.session_id, session.user_id, speaker_name, cleaned))
         )
         await publisher.publish(
-            to_subtitle_event(session.room_id, session.user_id, speaker_name, utt)
+            to_subtitle_event(session.room_id, session.user_id, speaker_name, cleaned)
         )
 
 
@@ -114,6 +122,7 @@ async def asr_stream(websocket: WebSocket, token: str = Query(...)) -> None:
     session: StreamSession | None = None
     engine: ASREngine | None = None
     gate: SpeechGate | None = None
+    smoother: TranscriptSmoother | None = None
     speaker_name = display_name_for_user(settings.sqlite_path, user_id)
     try:
         while True:
@@ -134,6 +143,7 @@ async def asr_stream(websocket: WebSocket, token: str = Query(...)) -> None:
                 engine = build_asr_engine(settings, msg.payload)
                 gate, vad_name = build_speech_gate(settings.asr_vad, settings.asr_vad_threshold)
                 gate.reset()
+                smoother = TranscriptSmoother()
                 if msg.payload.speaker_labels:
                     speaker_name = display_name_for_user(settings.sqlite_path, user_id)
                 else:
@@ -147,7 +157,13 @@ async def asr_stream(websocket: WebSocket, token: str = Query(...)) -> None:
                     )
                 )
             elif isinstance(msg, AsrAudioEvent):
-                if session is None or engine is None or gate is None or session.session_id != msg.session_id:
+                if (
+                    session is None
+                    or engine is None
+                    or gate is None
+                    or smoother is None
+                    or session.session_id != msg.session_id
+                ):
                     await websocket.send_json(
                         _error(msg.session_id, ErrorCode.INTERNAL_ERROR, "Call asr.start first")
                     )
@@ -169,14 +185,26 @@ async def asr_stream(websocket: WebSocket, token: str = Query(...)) -> None:
                         speech_bytes=len(speech),
                     )
                 )
-                await _emit_transcripts(websocket, session, speaker_name, engine.feed(speech))
+                await _emit_transcripts(
+                    websocket,
+                    session,
+                    speaker_name,
+                    await asyncio.to_thread(engine.feed, speech),
+                    smoother,
+                )
             elif isinstance(msg, AsrStopEvent):
-                if session is None or engine is None:
+                if session is None or engine is None or smoother is None:
                     await websocket.send_json(
                         _error(msg.session_id, ErrorCode.INTERNAL_ERROR, "No active session")
                     )
                     continue
-                await _emit_transcripts(websocket, session, speaker_name, engine.flush())
+                await _emit_transcripts(
+                    websocket,
+                    session,
+                    speaker_name,
+                    await asyncio.to_thread(engine.flush),
+                    smoother,
+                )
                 total = session.stop()
                 await websocket.send_json(
                     _info(
@@ -189,6 +217,7 @@ async def asr_stream(websocket: WebSocket, token: str = Query(...)) -> None:
                 session = None
                 engine = None
                 gate = None
+                smoother = None
             else:
                 await websocket.send_json(
                     _error(msg.session_id, ErrorCode.INTERNAL_ERROR, "Unexpected ASR event from client")

@@ -13,9 +13,13 @@ def test_default_ports_and_cors() -> None:
     assert "http://localhost:8000" in settings.cors_origin_list
     assert settings.max_participants == 4
     assert settings.asr_engine == "mock"
+    assert settings.asr_remote_token == ""
     assert settings.asr_onnx_path == ""
     assert settings.asr_vad == "silero"
     assert settings.signaling_internal_url == "http://127.0.0.1:8000"
+    assert settings.signaling_disconnect_grace_s == 3.0
+    assert settings.asr_public_ws_url == ""
+    assert settings.asr_upstream_ws_url == ""
     assert settings.web_client_dir == PROJECT_ROOT / "web_client"
     assert settings.sqlite_path == PROJECT_ROOT / "data" / "app.db"
 

@@ -35,11 +35,17 @@ class Settings(BaseSettings):
         secret_key: HMAC/session secret; override in `.env` before any deploy.
         asr_engine: `mock` until a real engine is wired (step 2/4).
         asr_remote_url: Optional Colab/ngrok base URL for remote ASR.
+        asr_remote_token: Optional `X-Worker-Token` for the Colab worker.
         asr_onnx_path: Optional local ONNX checkpoint (step 4); empty uses mock.
         signaling_internal_url: Base URL ASR uses to POST `subtitle.update` into rooms.
         asr_vad: `silero` (CPU ONNX), `energy` (RMS fallback), or `off`.
         asr_vad_threshold: Speech probability cutoff for Silero (0–1).
         max_participants: Hard cap for a room (product MVP: 4).
+        signaling_disconnect_grace_s: Delay before leave-on-WS-drop (reconnect).
+        asr_public_ws_url: Optional full public ASR WS URL (second tunnel). Empty
+            uses same-origin `/v1/asr-stream` proxied to the local ASR process.
+        asr_upstream_ws_url: Optional upstream for that proxy. Empty uses
+            `ws://127.0.0.1:{asr_port}/v1/stream`.
     """
 
     model_config = SettingsConfigDict(
@@ -59,11 +65,15 @@ class Settings(BaseSettings):
     secret_key: str = "dev-only-change-me"
     asr_engine: str = "mock"
     asr_remote_url: str = ""
+    asr_remote_token: str = ""
     asr_onnx_path: str = ""
     signaling_internal_url: str = "http://127.0.0.1:8000"
     asr_vad: str = "silero"
     asr_vad_threshold: float = Field(default=0.5, ge=0.0, le=1.0)
     max_participants: int = Field(default=4, ge=2, le=4)
+    signaling_disconnect_grace_s: float = Field(default=3.0, ge=0.0, le=60.0)
+    asr_public_ws_url: str = ""
+    asr_upstream_ws_url: str = ""
 
     @field_validator("sqlite_path", "web_client_dir", mode="before")
     @classmethod

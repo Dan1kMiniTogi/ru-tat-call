@@ -1,3 +1,3 @@
 # tests
 
-Сквозные сценарии: контракты, config, REST, WebSocket (2 и 3 клиента, лимит комнаты).
+Сквозные сценарии: контракты, config, REST, WebSocket, реконнект, HTTPS/ASR-прокси, Docker Compose, e2e субтитры, Colab worker, latency bench, postprocess.

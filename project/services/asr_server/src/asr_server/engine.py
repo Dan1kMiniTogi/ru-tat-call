@@ -1,13 +1,15 @@
-"""ASR engine protocol: mock now, Colab/ONNX later without changing the WS loop.
+"""ASR engine protocol: mock, Colab remote, or local ONNX stub.
 
 The WebSocket handler only calls `feed` / `flush`. Swap engines via `ASR_ENGINE`.
 """
 
 from __future__ import annotations
 
+import base64
 from dataclasses import dataclass
 from typing import Literal, Optional, Protocol
 
+import httpx
 from ru_tat_call_shared.config import Settings
 from ru_tat_call_shared.contracts.asr import (
     AsrFinalEvent,
@@ -95,6 +97,7 @@ def build_asr_engine(settings: Settings, start: AsrStartPayload) -> ASREngine:
     if kind == "remote" and (settings.asr_remote_url or "").strip():
         return RemoteColabASREngine(
             base_url=settings.asr_remote_url.strip(),
+            worker_token=(settings.asr_remote_token or "").strip(),
             return_partial=start.return_partial,
             return_final=start.return_final,
         )
@@ -113,19 +116,21 @@ def build_asr_engine(settings: Settings, start: AsrStartPayload) -> ASREngine:
 
 
 class RemoteColabASREngine:
-    """Placeholder for step 4.2: HTTP worker behind ngrok/cloudflared.
+    """POST PCM to the Colab worker (`project/apps/colab_asr/worker.py`).
 
-    Planned worker contract (not called until 4.2 fills `feed`):
     `POST {base_url}/v1/transcribe` JSON `{audio_base64, sample_rate, encoding}`
-    → `{text, language, is_final}`. Failures must return [] (call stays up).
+    → `{text, language, is_final}`. Network/HTTP failures return [] so the call stays up.
 
     Args:
-        base_url: Tunnel origin, e.g. https://xxxx.ngrok.io.
+        base_url: Tunnel origin, e.g. https://xxxx.ngrok-free.app.
+        worker_token: Optional `X-Worker-Token` (same as worker `--token`).
         return_partial: Honor asr.start.return_partial.
         return_final: Honor asr.start.return_final.
+        http_client: Injected `httpx.Client` (tests). Owned client is created otherwise.
+        timeout_s: HTTP timeout in seconds (Colab cold start can be slow).
 
     Example:
-        RemoteColabASREngine("https://xxxx.ngrok.io")
+        RemoteColabASREngine("https://xxxx.ngrok-free.app")
     """
 
     name = "remote"
@@ -134,21 +139,115 @@ class RemoteColabASREngine:
         self,
         base_url: str,
         *,
+        worker_token: str = "",
         return_partial: bool = True,
         return_final: bool = True,
+        http_client: Optional[httpx.Client] = None,
+        timeout_s: float = 20.0,
     ) -> None:
         self.base_url = base_url.rstrip("/")
+        self.worker_token = worker_token
         self.return_partial = return_partial
         self.return_final = return_final
+        self._owns_client = http_client is None
+        self._client = http_client or httpx.Client(timeout=timeout_s)
+        self._sub_n = 0
+        self._subtitle_id = self._alloc_id()
+        self._open_text = ""
+        self._open_language = SpeechLanguage.UNKNOWN
+
+    def _alloc_id(self) -> str:
+        self._sub_n += 1
+        return f"sub_remote_{self._sub_n}"
+
+    def _parse_language(self, raw: object) -> SpeechLanguage:
+        try:
+            return SpeechLanguage(str(raw or "unknown"))
+        except ValueError:
+            return SpeechLanguage.UNKNOWN
+
+    def _headers(self) -> dict[str, str]:
+        headers = {
+            "Content-Type": "application/json",
+            "ngrok-skip-browser-warning": "1",
+        }
+        if self.worker_token:
+            headers["X-Worker-Token"] = self.worker_token
+        return headers
+
+    def _post(self, pcm: bytes) -> Optional[dict]:
+        try:
+            resp = self._client.post(
+                f"{self.base_url}/v1/transcribe",
+                json={
+                    "audio_base64": base64.b64encode(pcm).decode("ascii"),
+                    "sample_rate": 16000,
+                    "encoding": "pcm_s16le",
+                },
+                headers=self._headers(),
+            )
+            if resp.status_code != 200:
+                return None
+            data = resp.json()
+            return data if isinstance(data, dict) else None
+        except Exception:
+            return None
+
+    def _utterance(self, text: str, language: SpeechLanguage, status: Literal["partial", "final"]) -> TranscriptUtterance:
+        return TranscriptUtterance(
+            subtitle_id=self._subtitle_id,
+            text=text,
+            status=status,
+            language=language,
+        )
 
     def feed(self, pcm: bytes) -> list[TranscriptUtterance]:
-        """No-op until the Colab connector lands (step 4.2)."""
-        _ = pcm
-        return []
+        """Send VAD-gated speech to the worker. Returns [] on empty PCM or errors.
+
+        Args:
+            pcm: 16 kHz mono s16le speech bytes.
+
+        Returns:
+            Zero or one partial/final step.
+        """
+        if not pcm:
+            return []
+        body = self._post(pcm)
+        if not body:
+            return []
+        text = str(body.get("text") or "").strip()
+        if not text:
+            return []
+        language = self._parse_language(body.get("language"))
+        is_final = bool(body.get("is_final"))
+        if is_final:
+            if not self.return_final:
+                self._open_text = ""
+                self._subtitle_id = self._alloc_id()
+                return []
+            utt = self._utterance(text, language, "final")
+            self._open_text = ""
+            self._subtitle_id = self._alloc_id()
+            return [utt]
+        self._open_text = text
+        self._open_language = language
+        if not self.return_partial:
+            return []
+        return [self._utterance(text, language, "partial")]
 
     def flush(self) -> list[TranscriptUtterance]:
-        """No-op until the Colab connector lands (step 4.2)."""
-        return []
+        """Turn a leftover partial into a final on asr.stop.
+
+        Returns:
+            Zero or one final utterance.
+        """
+        if not self._open_text or not self.return_final:
+            self._open_text = ""
+            return []
+        utt = self._utterance(self._open_text, self._open_language, "final")
+        self._open_text = ""
+        self._subtitle_id = self._alloc_id()
+        return [utt]
 
 
 class LocalOnnxASREngine:

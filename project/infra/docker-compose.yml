@@ -1,0 +1,82 @@
+# One command: UI + signaling :8000, ASR on the internal network, shared SQLite.
+#
+# From project/:
+#     docker compose -f infra/docker-compose.yml up --build
+# Then http://127.0.0.1:8000/  (demo: you / mama / sister, password family)
+#
+# Optional host env: docker compose --env-file .env -f infra/docker-compose.yml up --build
+name: ru-tat-call
+
+services:
+  signaling:
+    build:
+      context: ..
+      dockerfile: infra/Dockerfile
+    command:
+      - uvicorn
+      - signaling_server.app:app
+      - --host
+      - "0.0.0.0"
+      - --port
+      - "8000"
+      - --proxy-headers
+      - --forwarded-allow-ips
+      - "*"
+    ports:
+      - "8000:8000"
+    environment:
+      SQLITE_PATH: /data/app.db
+      WEB_CLIENT_DIR: /app/web_client
+      ASR_UPSTREAM_WS_URL: ws://asr:8001/v1/stream
+      SIGNALING_INTERNAL_URL: http://signaling:8000
+      SIGNALING_HOST: 0.0.0.0
+      SIGNALING_PORT: "8000"
+      ASR_PORT: "8001"
+      SECRET_KEY: ${SECRET_KEY:-dev-only-change-me}
+    volumes:
+      - sqlite-data:/data
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health')"
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 20s
+
+  asr:
+    build:
+      context: ..
+      dockerfile: infra/Dockerfile
+    command:
+      - uvicorn
+      - asr_server.app:app
+      - --host
+      - "0.0.0.0"
+      - --port
+      - "8001"
+    environment:
+      SQLITE_PATH: /data/app.db
+      SIGNALING_INTERNAL_URL: http://signaling:8000
+      ASR_HOST: 0.0.0.0
+      ASR_PORT: "8001"
+      SECRET_KEY: ${SECRET_KEY:-dev-only-change-me}
+    volumes:
+      - sqlite-data:/data
+    depends_on:
+      - signaling
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8001/health')"
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 25s
+
+volumes:
+  sqlite-data:

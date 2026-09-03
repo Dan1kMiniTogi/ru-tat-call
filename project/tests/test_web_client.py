@@ -30,6 +30,18 @@ def test_index_and_assets(tmp_path: Path) -> None:
         assert "RTCPeerConnection" in mesh.text
         assert "sdpMid" in mesh.text
         assert "onRoomReady" in mesh.text
+        assert "subtitle.update" in mesh.text
+        assert "iceRestart" in mesh.text
+        recon = client.get("/js/reconnect.js")
+        assert recon.status_code == 200
+        assert "nextDelay" in recon.text
+        assert "reconnect.js" in page.text
+        subs = client.get("/js/subtitles.js")
+        assert subs.status_code == 200
+        assert "SubtitleStore" in subs.text
+        assert "subtitle-panel" in page.text
+        assert "subtitle-list" in css.text
+        assert "subtitles.js" in page.text
         pcm = client.get("/js/pcm.js")
         assert pcm.status_code == 200
         assert "downsampleTo16k" in pcm.text
@@ -39,6 +51,7 @@ def test_index_and_assets(tmp_path: Path) -> None:
         asr_js = client.get("/js/asr.js")
         assert asr_js.status_code == 200
         assert "asr.audio" in asr_js.text
+        assert "_wantLive" in asr_js.text
         capture = client.get("/js/pcm-capture.js")
         assert capture.status_code == 200
         assert "audioWorklet" in capture.text
@@ -47,7 +60,7 @@ def test_index_and_assets(tmp_path: Path) -> None:
         cfg = client.get("/v1/client-config")
         assert cfg.status_code == 200
         url = cfg.json()["asr_ws_url"]
-        assert url.endswith("/v1/stream")
-        assert ":8001/" in url or url.endswith(":8001/v1/stream")
+        assert url.endswith("/v1/asr-stream")
+        assert ":8001" not in url
         assert client.get("/health").json() == {"ok": True}
         assert client.get("/v1/users/me").status_code == 401

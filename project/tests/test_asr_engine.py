@@ -25,17 +25,18 @@ def test_remote_without_url_falls_back_to_mock() -> None:
     assert isinstance(engine, MockEngine)
 
 
-def test_remote_with_url_is_stub() -> None:
+def test_remote_with_url_selects_colab_engine() -> None:
     settings = Settings(
         _env_file=None,
         asr_engine="remote",
         asr_remote_url="https://example.ngrok.io",
+        asr_remote_token="tok",
     )
     engine = build_asr_engine(settings, _start())
     assert isinstance(engine, RemoteColabASREngine)
     assert engine.name == "remote"
-    assert engine.feed(b"\x00" * TICK_BYTES) == []
-    assert engine.flush() == []
+    assert engine.base_url == "https://example.ngrok.io"
+    assert engine.worker_token == "tok"
 
 
 def test_local_without_path_falls_back_to_mock() -> None:

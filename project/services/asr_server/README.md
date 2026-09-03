@@ -1,6 +1,6 @@
 # asr_server
 
-Потоковый ASR: VAD → `ASREngine` (`mock` / заглушки `remote` и `local`).
+Потоковый ASR: VAD → `ASREngine` → `TranscriptSmoother` (склейка / дедуп / точка на final).
 
 ```bash
 cd project
@@ -8,4 +8,4 @@ uv run uvicorn signaling_server.app:app --host 0.0.0.0 --port 8000
 uv run uvicorn asr_server.app:app --host 0.0.0.0 --port 8001
 ```
 
-`ASR_ENGINE=mock` (по умолчанию). `remote` нужен `ASR_REMOTE_URL`, `local` — `ASR_ONNX_PATH`; иначе снова mock. Инференс Colab/ONNX — фаза 4.
+`ASR_ENGINE=mock` по умолчанию. Живой Colab: `ASR_ENGINE=remote` и `ASR_REMOTE_URL`. Замер задержки: `uv run python apps/colab_asr/benchmark.py`.

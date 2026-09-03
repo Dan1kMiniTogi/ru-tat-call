@@ -1,0 +1,14 @@
+# Named Cloudflare Tunnel (optional). Needs a Cloudflare account and `cloudflared tunnel login`.
+# For a one-off family call, prefer: ./infra/tunnel.sh  (quick tunnel, no account).
+#
+#   cloudflared tunnel create ru-tat-call
+#   cloudflared tunnel route dns ru-tat-call call.example.com
+#   cloudflared tunnel --config cloudflared.yml run
+
+tunnel: YOUR_TUNNEL_UUID
+credentials-file: /home/YOU/.cloudflared/YOUR_TUNNEL_UUID.json
+
+ingress:
+  - hostname: call.example.com
+    service: http://127.0.0.1:8000
+  - service: http_status:404

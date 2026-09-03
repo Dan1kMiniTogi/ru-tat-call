@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import time
 from dataclasses import dataclass, field
 from typing import Optional
@@ -61,20 +62,35 @@ class RoomManager:
 
     Args:
         max_participants: Product cap (default 4).
+        disconnect_grace_s: Wait before `participant.left` so a WS reconnect
+            can keep the same room membership (step 5.1).
 
     Example:
-        manager = RoomManager(max_participants=4)
+        manager = RoomManager(max_participants=4, disconnect_grace_s=3.0)
         await manager.connect("u_you", websocket)
     """
 
-    def __init__(self, max_participants: int = 4) -> None:
+    def __init__(self, max_participants: int = 4, disconnect_grace_s: float = 3.0) -> None:
         self.max_participants = max_participants
+        self.disconnect_grace_s = max(0.0, float(disconnect_grace_s))
         self._sockets: dict[str, WebSocket] = {}
         self._rooms: dict[str, Room] = {}
         self._user_room: dict[str, str] = {}
+        self._leave_after: dict[str, asyncio.Task] = {}
+
+    def _cancel_leave(self, user_id: str) -> None:
+        task = self._leave_after.pop(user_id, None)
+        if task is not None:
+            task.cancel()
+
+    def cancel_pending_leaves(self) -> None:
+        """Cancel delayed leave tasks (app shutdown / tests)."""
+        for user_id in list(self._leave_after):
+            self._cancel_leave(user_id)
 
     async def connect(self, user_id: str, websocket: WebSocket) -> None:
-        """Register a live signaling socket for the user."""
+        """Register a live signaling socket. Cancels a pending leave (reconnect)."""
+        self._cancel_leave(user_id)
         previous = self._sockets.get(user_id)
         self._sockets[user_id] = websocket
         if previous is not None and previous is not websocket:
@@ -84,11 +100,31 @@ class RoomManager:
                 pass
 
     async def disconnect(self, user_id: str, websocket: Optional[WebSocket] = None) -> None:
-        """Drop the socket and leave any room (sends participant.left)."""
+        """Drop this socket. Leave the room only after `disconnect_grace_s`.
+
+        A newer socket for the same user is ignored (stale close after reconnect).
+        """
         current = self._sockets.get(user_id)
         if websocket is not None and current is not websocket:
             return
         self._sockets.pop(user_id, None)
+        if user_id not in self._user_room:
+            return
+        if self.disconnect_grace_s <= 0:
+            await self._leave_room(user_id, self._user_room[user_id])
+            return
+        self._cancel_leave(user_id)
+        self._leave_after[user_id] = asyncio.create_task(self._grace_leave(user_id))
+
+    async def _grace_leave(self, user_id: str) -> None:
+        """Leave the room if the user did not reconnect in time."""
+        try:
+            await asyncio.sleep(self.disconnect_grace_s)
+        except asyncio.CancelledError:
+            return
+        self._leave_after.pop(user_id, None)
+        if user_id in self._sockets:
+            return
         room_id = self._user_room.get(user_id)
         if room_id:
             await self._leave_room(user_id, room_id)
@@ -299,9 +335,6 @@ class RoomManager:
             )
             return
         if not self.is_online(target):
-            await self.send_error(
-                user_id, msg.request_id, ErrorCode.USER_OFFLINE, "Peer is offline"
-            )
             return
         await self.send(target, dump_message(msg))
 
@@ -329,6 +362,8 @@ class RoomManager:
         return delivered
 
     async def _leave_room(self, user_id: str, room_id: str) -> None:
+        if user_id in self._sockets:
+            return
         room = self._rooms.get(room_id)
         self._user_room.pop(user_id, None)
         if room is None:
